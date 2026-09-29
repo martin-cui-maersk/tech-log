@@ -1,30 +1,30 @@
-# tech-log
+# 技术随笔
 
-> A Vue.js project
+> 个人技术学习笔记与文档
 
-## Build Setup
+## 简介
 
-``` bash
-# install dependencies
+这里记录了我在技术学习过程中的心得、笔记和文档。主要涵盖 Git、PHP、算法、网络、设计模式等技术领域。
+
+## 技术栈
+
+- Vue 2 + Vue Router
+- Webpack 3
+- Markdown-it
+
+## 构建
+
+```bash
+# 安装依赖
 npm install
 
-# serve with hot reload at localhost:8080
+# 本地开发
 npm run dev
 
-# build for production with minification
+# 生产构建
 npm run build
-
-# build for production and view the bundle analyzer report
-npm run build --report
-
-# run unit tests
-npm run unit
-
-# run e2e tests
-npm run e2e
-
-# run all tests
-npm test
 ```
 
-For a detailed explanation on how things work, check out the [guide](http://vuejs-templates.github.io/webpack/) and [docs for vue-loader](http://vuejs.github.io/vue-loader).
+## 版本
+
+- v1.0.0 (2026-09-29) - 初始版本，包含 Git 模块文档

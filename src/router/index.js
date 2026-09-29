@@ -1,5 +1,6 @@
 import Vue from 'vue'
 import Router from 'vue-router'
+import Home from '@/components/Home'
 import GitDocs from '@/components/GitDocs'
 
 Vue.use(Router)
@@ -8,7 +9,8 @@ export default new Router({
   routes: [
     {
       path: '/',
-      redirect: '/git/git-merge'
+      name: 'Home',
+      component: Home
     },
     {
       path: '/git/:doc',

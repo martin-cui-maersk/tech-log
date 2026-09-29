@@ -8,10 +8,12 @@
 import MarkdownViewer from './MarkdownViewer'
 import gitMerge from '@/assets/docs/git-merge.md'
 import gitWorkflow from '@/assets/docs/git-workflow.md'
+import hyperfSleep from '@/assets/docs/hyperf-sleep.md'
 
 const docs = {
   'git-merge': gitMerge,
-  'git-workflow': gitWorkflow
+  'git-workflow': gitWorkflow,
+  'hyperf-sleep': hyperfSleep
 }
 
 export default {
