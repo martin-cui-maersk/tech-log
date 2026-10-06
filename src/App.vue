@@ -75,6 +75,20 @@
         <router-view/>
       </main>
     </div>
+    <!-- 回到顶部：往下滚一段才出现 -->
+    <button
+      type="button"
+      class="back-to-top"
+      :class="{ 'is-visible': showBackToTop }"
+      aria-label="回到顶部"
+      title="回到顶部"
+      @click="scrollToTop"
+    >
+      <svg width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M8 13 V3.4" />
+        <path d="M3.6 7.8 L8 3.4 L12.4 7.8" />
+      </svg>
+    </button>
   </div>
 </template>
 
@@ -83,6 +97,8 @@ import { categories } from '@/utils/docRegistry'
 
 const STORAGE_KEY = 'tech-log:sidebar-open'
 const GROUPS_STORAGE_KEY = 'tech-log:collapsed-groups'
+// 滚动超过这个像素数才显示"回到顶部"
+const BACK_TO_TOP_OFFSET = 300
 
 function readSidebarPreference () {
   let saved = null
@@ -117,12 +133,21 @@ export default {
       categories: categories,
       sidebarOpen: true,
       // 被折叠起来的分类名，例如 ['MySQL', 'Hyperf']
-      collapsedGroups: []
+      collapsedGroups: [],
+      // 往下滚超过一定距离后才显示"回到顶部"
+      showBackToTop: false
     }
   },
   created () {
     this.sidebarOpen = readSidebarPreference()
     this.collapsedGroups = readCollapsedGroups()
+  },
+  mounted () {
+    window.addEventListener('scroll', this.handleScroll, { passive: true })
+    this.handleScroll() // 刷新后浏览器可能已经恢复滚动位置
+  },
+  beforeDestroy () {
+    window.removeEventListener('scroll', this.handleScroll, { passive: true })
   },
   watch: {
     // 窄屏时侧边栏是浮层，点了文档就自动收起，避免挡住正文
@@ -133,6 +158,23 @@ export default {
     }
   },
   methods: {
+    handleScroll () {
+      const top = window.pageYOffset || document.documentElement.scrollTop || 0
+      const visible = top > BACK_TO_TOP_OFFSET
+      if (visible !== this.showBackToTop) {
+        this.showBackToTop = visible
+      }
+    },
+    scrollToTop () {
+      const reduceMotion = window.matchMedia &&
+        window.matchMedia('(prefers-reduced-motion: reduce)').matches
+      // 老浏览器不支持 smooth 时退化成直接跳转
+      if (!reduceMotion && 'scrollBehavior' in document.documentElement.style) {
+        window.scrollTo({ top: 0, behavior: 'smooth' })
+      } else {
+        window.scrollTo(0, 0)
+      }
+    },
     toggleSidebar () {
       this.setSidebar(!this.sidebarOpen)
     },
@@ -470,6 +512,53 @@ body {
   max-width: 100%;
 }
 
+/* 右下角"回到顶部" */
+.back-to-top {
+  position: fixed;
+  right: 32px;
+  bottom: 32px;
+  z-index: 90;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  color: var(--content-text-light);
+  background-color: var(--content-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 50%;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  cursor: pointer;
+  /* 默认隐藏：visibility 让它同时退出 Tab 顺序和读屏 */
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(8px);
+  transition: opacity 0.2s ease, visibility 0.2s ease, transform 0.2s ease,
+    color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.back-to-top.is-visible {
+  opacity: 1;
+  visibility: visible;
+  transform: none;
+}
+
+.back-to-top:hover {
+  color: var(--theme-color);
+  border-color: var(--theme-color);
+  box-shadow: 0 4px 14px rgba(62, 175, 124, 0.22);
+}
+
+.back-to-top.is-visible:hover {
+  transform: translateY(-2px);
+}
+
+.back-to-top:focus-visible {
+  outline: 2px solid var(--theme-color);
+  outline-offset: 2px;
+}
+
 /* 窄屏：侧边栏改为浮层，收起时正文占满整屏 */
 @media (max-width: 1080px) {
   .content {
@@ -480,6 +569,13 @@ body {
 
   .sidebar {
     box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  }
+
+  .back-to-top {
+    right: 16px;
+    bottom: 16px;
+    width: 40px;
+    height: 40px;
   }
 }
 </style>

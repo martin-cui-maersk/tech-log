@@ -26,5 +26,9 @@ export default new Router({
       path: '/git/:doc',
       component: DocsView
     }
-  ]
+  ],
+  // 切换文档时回到页面顶部（浏览器前进/后退时恢复原来的位置）
+  scrollBehavior (to, from, savedPosition) {
+    return savedPosition || { x: 0, y: 0 }
+  }
 })

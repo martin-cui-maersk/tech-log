@@ -95,6 +95,7 @@ npm run build
 - 所有 markdown 内容都会打进 `app.js`，所以**新增文件后必须重新构建**才能在页面上看到；`npm run dev` 挂着时 webpack 会自动重建。
 - 文档多了以后 `app.js` 会变大，如果明显影响首屏加载，可以把文档改成按需加载（`import()` 分包）。
 - markdown 里引用图片时建议用绝对路径 `/tech-log/static/img/xxx.png`，图片放在 `static/` 目录下。
+- 右下角有「回到顶部」按钮：往下滚超过 300px 才出现，点击平滑滚回顶部；点侧边栏切换文档会自动回到页面顶部（浏览器前进/后退时恢复原来位置）。阈值在 `src/App.vue` 的 `BACK_TO_TOP_OFFSET`。
 
 ## 版本
 
