@@ -1,7 +1,7 @@
 ---
 navTitle: Hyperf 协程与阻塞处理
 category: Hyperf
-order: 3
+order: 4
 ---
 # Hyperf 协程机制与阻塞处理指南
 
