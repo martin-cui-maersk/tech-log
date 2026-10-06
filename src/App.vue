@@ -22,6 +22,7 @@
           <router-link to="/" class="nav-title">技术随笔</router-link>
         </div>
         <div class="nav-actions">
+          <DocSearch />
           <button
             type="button"
             class="theme-toggle"
@@ -113,6 +114,7 @@
 
 <script>
 import { categories } from '@/utils/docRegistry'
+import DocSearch from '@/components/DocSearch'
 import { resolveTheme, applyTheme, storeTheme, systemTheme, readStoredTheme, watchSystemTheme } from '@/utils/theme'
 
 const STORAGE_KEY = 'tech-log:sidebar-open'
@@ -151,6 +153,9 @@ function readCollapsedGroups () {
 
 export default {
   name: 'App',
+  components: {
+    DocSearch
+  },
   data () {
     return {
       categories: categories,

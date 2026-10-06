@@ -29,6 +29,13 @@ export default new Router({
   ],
   // 切换文档时回到页面顶部（浏览器前进/后退时恢复原来的位置）
   scrollBehavior (to, from, savedPosition) {
-    return savedPosition || { x: 0, y: 0 }
+    if (savedPosition) {
+      return savedPosition
+    }
+    // 带 #锚点（比如搜索结果）：滚到对应小节，留出固定导航栏的高度
+    if (to.hash) {
+      return { selector: to.hash, offset: { x: 0, y: 84 } }
+    }
+    return { x: 0, y: 0 }
   }
 })

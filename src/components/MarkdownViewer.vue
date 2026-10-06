@@ -4,16 +4,11 @@
 
 <script>
 import MarkdownIt from 'markdown-it'
+import { headingId } from '@/utils/anchor'
 
 function addAnchorIds (html) {
   return html.replace(/<h([1-6])>(.*?)<\/h\1>/g, (match, level, text) => {
-    const id = text
-      .replace(/<[^>]+>/g, '')
-      .replace(/[^\w\u4e00-\u9fa5\s-]/g, '')
-      .trim()
-      .replace(/\s+/g, '-')
-      .toLowerCase()
-    return `<h${level} id="${id}">${text}</h${level}>`
+    return `<h${level} id="${headingId(text)}">${text}</h${level}>`
   })
 }
 
