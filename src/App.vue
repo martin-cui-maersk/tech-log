@@ -32,7 +32,8 @@
         <div class="sidebar-inner">
           <div class="sidebar-group">
             <div class="sidebar-group-title">首页</div>
-            <router-link to="/" class="sidebar-link">前言</router-link>
+            <!-- exact：否则 "/" 是任何路径的前缀，"前言"会在所有文档页一直高亮 -->
+            <router-link to="/" class="sidebar-link" exact>前言</router-link>
           </div>
           <!-- 分类与文档由 src/assets/docs 自动扫描生成，新增文件后无需改这里 -->
           <div v-for="(group, index) in categories" :key="group.name" class="sidebar-group">
@@ -64,6 +65,7 @@
                 :key="doc.slug"
                 :to="'/docs/' + doc.slug"
                 class="sidebar-link"
+                exact
               >{{ doc.navTitle }}</router-link>
             </div>
           </div>
