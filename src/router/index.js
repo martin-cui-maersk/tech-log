@@ -6,6 +6,8 @@ import GitDocs from '@/components/GitDocs'
 Vue.use(Router)
 
 export default new Router({
+  mode: 'history',
+  base: '/tech-log/',
   routes: [
     {
       path: '/',
