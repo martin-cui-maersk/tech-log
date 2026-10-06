@@ -49,6 +49,8 @@ export default {
   font-size: 16px;
   color: var(--content-text);
   max-width: 900px;
+  /* 在可用宽度里居中，侧边栏收起时不会整块贴在左边 */
+  margin: 0 auto;
 }
 
 .markdown-body >>> h1 {

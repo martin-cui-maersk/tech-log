@@ -1,3 +1,8 @@
+---
+navTitle: Hyperf 协程与阻塞处理
+category: Hyperf
+order: 3
+---
 # Hyperf 协程机制与阻塞处理指南
 
 本文档总结了 Hyperf 框架中协程（Coroutine）的工作原理、为什么推荐使用 `\Hyperf\Coroutine\Coroutine::sleep()`，以及常见的阻塞场景与优化方案。

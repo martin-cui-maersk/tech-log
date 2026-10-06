@@ -51,7 +51,10 @@ module.exports = {
     // Paths
     assetsRoot: path.resolve(__dirname, '../docs'),
     assetsSubDirectory: 'static',
-    assetsPublicPath: './',
+    // 必须是绝对路径：文档页地址形如 /tech-log/docs/xxx，
+    // 用相对路径 './' 时浏览器会去请求 /tech-log/docs/static/... 导致刷新后白屏。
+    // 如果仓库改名或换成自定义域名，这里要和 router 的 base 一起改。
+    assetsPublicPath: '/tech-log/',
 
     /**
      * Source Maps

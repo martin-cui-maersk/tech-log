@@ -33,23 +33,39 @@
 
     <div class="info-section">
       <h2>文档导航</h2>
-      <ul class="doc-list">
-        <li><router-link to="/git/git-merge">Git 合并指南</router-link> - 功能分支合并到 gray/master 的完整流程</li>
-        <li><router-link to="/git/git-workflow">Git 工作流</router-link> - Git 开发与部署标准作业流程</li>
-      </ul>
+      <!-- 这里的内容来自 src/assets/docs 自动扫描，新增 markdown 文件后无需改动 -->
+      <p v-if="!docs.length" class="empty-tip">还没有文档，把 .md 文件放进 src/assets/docs 就可以了。</p>
+      <div v-for="group in categories" :key="group.name" class="doc-group">
+        <h3>{{ group.name }}</h3>
+        <ul class="doc-list">
+          <li v-for="doc in group.docs" :key="doc.slug">
+            <router-link :to="'/docs/' + doc.slug">{{ doc.title }}</router-link>
+            <span v-if="doc.description" class="doc-desc"> - {{ doc.description }}</span>
+          </li>
+        </ul>
+      </div>
     </div>
   </div>
 </template>
 
 <script>
+import { docs, categories } from '@/utils/docRegistry'
+
 export default {
-  name: 'Home'
+  name: 'Home',
+  data () {
+    return {
+      docs: docs,
+      categories: categories
+    }
+  }
 }
 </script>
 
 <style scoped>
 .home {
   max-width: 860px;
+  margin: 0 auto;
 }
 
 .hero {
@@ -108,6 +124,19 @@ export default {
   font-weight: 600;
 }
 
+.doc-group {
+  margin-bottom: 24px;
+}
+
+.doc-group h3 {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--content-text-light);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 8px;
+}
+
 .doc-list {
   list-style: none;
   padding: 0;
@@ -126,5 +155,14 @@ export default {
 
 .doc-list a:hover {
   text-decoration: underline;
+}
+
+.doc-desc {
+  color: var(--content-text-light);
+  font-size: 14px;
+}
+
+.empty-tip {
+  color: var(--content-text-light);
 }
 </style>

@@ -2,28 +2,47 @@
   <div id="app">
     <header class="nav-bar">
       <div class="nav-container">
-        <router-link to="/" class="nav-title">技术随笔</router-link>
+        <div class="nav-left">
+          <button
+            type="button"
+            class="sidebar-toggle"
+            id="sidebar-toggle"
+            aria-controls="app-sidebar"
+            :aria-expanded="sidebarOpen ? 'true' : 'false'"
+            :title="sidebarOpen ? '收起侧边栏' : '展开侧边栏'"
+            @click="toggleSidebar"
+          >
+            <svg width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true">
+              <rect x="1.7" y="2.7" width="12.6" height="10.6" rx="2" />
+              <line x1="6.6" y1="2.7" x2="6.6" y2="13.3" />
+              <rect v-if="sidebarOpen" x="2.8" y="3.8" width="2.8" height="8.4" fill="currentColor" stroke="none" opacity="0.35" />
+            </svg>
+            <span class="sr-only">{{ sidebarOpen ? '收起侧边栏' : '展开侧边栏' }}</span>
+          </button>
+          <router-link to="/" class="nav-title">技术随笔</router-link>
+        </div>
         <a href="https://github.com/martin-cui-maersk/tech-log" target="_blank" rel="noopener" class="edit-on-github">
           <svg height="16" width="16" viewBox="0 0 16 16" fill="currentColor" style="vertical-align: text-bottom; margin-right: 4px;"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg>
           Edit on GitHub
         </a>
       </div>
     </header>
-    <div class="layout">
-      <aside class="sidebar">
+    <div class="layout" :class="{ 'is-collapsed': !sidebarOpen }">
+      <aside id="app-sidebar" class="sidebar">
         <div class="sidebar-inner">
           <div class="sidebar-group">
             <div class="sidebar-group-title">首页</div>
             <router-link to="/" class="sidebar-link">前言</router-link>
           </div>
-          <div class="sidebar-group">
-            <div class="sidebar-group-title">Git</div>
-            <router-link to="/git/git-merge" class="sidebar-link">Git 合并指南</router-link>
-            <router-link to="/git/git-workflow" class="sidebar-link">Git 工作流</router-link>
-          </div>
-          <div class="sidebar-group">
-            <div class="sidebar-group-title">Hyperf</div>
-            <router-link to="/git/hyperf-sleep" class="sidebar-link">Hyperf 协程与阻塞处理</router-link>
+          <!-- 分类与文档由 src/assets/docs 自动扫描生成，新增文件后无需改这里 -->
+          <div v-for="group in categories" :key="group.name" class="sidebar-group">
+            <div class="sidebar-group-title">{{ group.name }}</div>
+            <router-link
+              v-for="doc in group.docs"
+              :key="doc.slug"
+              :to="'/docs/' + doc.slug"
+              class="sidebar-link"
+            >{{ doc.navTitle }}</router-link>
           </div>
         </div>
       </aside>
@@ -35,8 +54,59 @@
 </template>
 
 <script>
+import { categories } from '@/utils/docRegistry'
+
+const STORAGE_KEY = 'tech-log:sidebar-open'
+
+function readSidebarPreference () {
+  let saved = null
+  try {
+    saved = window.localStorage.getItem(STORAGE_KEY)
+  } catch (e) {
+    saved = null
+  }
+  if (saved === '1') {
+    return true
+  }
+  if (saved === '0') {
+    return false
+  }
+  // 没有记录过时，窄屏默认收起
+  return window.innerWidth > 1080
+}
+
 export default {
-  name: 'App'
+  name: 'App',
+  data () {
+    return {
+      categories: categories,
+      sidebarOpen: true
+    }
+  },
+  created () {
+    this.sidebarOpen = readSidebarPreference()
+  },
+  watch: {
+    // 窄屏时侧边栏是浮层，点了文档就自动收起，避免挡住正文
+    $route () {
+      if (this.sidebarOpen && window.innerWidth <= 1080) {
+        this.setSidebar(false)
+      }
+    }
+  },
+  methods: {
+    toggleSidebar () {
+      this.setSidebar(!this.sidebarOpen)
+    },
+    setSidebar (open) {
+      this.sidebarOpen = open
+      try {
+        window.localStorage.setItem(STORAGE_KEY, open ? '1' : '0')
+      } catch (e) {
+        // 隐私模式下 localStorage 不可用，忽略即可
+      }
+    }
+  }
 }
 </script>
 
@@ -96,6 +166,53 @@ body {
   height: 100%;
 }
 
+.nav-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+/* 侧边栏收起 / 展开按钮 */
+.sidebar-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  flex: none;
+  color: var(--content-text-light);
+  background-color: transparent;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: color 0.2s, background-color 0.2s, border-color 0.2s;
+}
+
+.sidebar-toggle:hover {
+  color: var(--theme-color);
+  background-color: var(--sidebar-bg);
+  border-color: var(--border-color);
+}
+
+.sidebar-toggle:focus-visible {
+  outline: 2px solid var(--theme-color);
+  outline-offset: 2px;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 .nav-title {
   font-size: 20px;
   font-weight: 700;
@@ -146,6 +263,8 @@ body {
 
 .layout {
   display: flex;
+  flex: 1;
+  min-width: 0;
   padding-top: 60px;
   min-height: 100vh;
 }
@@ -160,6 +279,13 @@ body {
   border-right: 1px solid var(--sidebar-border);
   overflow-y: auto;
   padding: 24px 0;
+  /* 收起时整条侧边栏滑出屏幕，同时隐藏起来，避免键盘 Tab 还能聚焦到不可见的链接 */
+  transition: transform 0.25s ease, visibility 0.25s ease;
+}
+
+.layout.is-collapsed .sidebar {
+  transform: translateX(-100%);
+  visibility: hidden;
 }
 
 .sidebar-group {
@@ -203,5 +329,24 @@ body {
   margin-left: 280px;
   padding: 40px 60px;
   max-width: calc(100% - 280px);
+  transition: margin-left 0.25s ease, max-width 0.25s ease;
+}
+
+.layout.is-collapsed .content {
+  margin-left: 0;
+  max-width: 100%;
+}
+
+/* 窄屏：侧边栏改为浮层，收起时正文占满整屏 */
+@media (max-width: 1080px) {
+  .content {
+    margin-left: 0;
+    max-width: 100%;
+    padding: 32px 24px;
+  }
+
+  .sidebar {
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  }
 }
 </style>

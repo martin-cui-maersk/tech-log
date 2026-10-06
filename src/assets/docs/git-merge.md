@@ -1,3 +1,10 @@
+---
+title: Git 合并流程完整指南（合并到 gray / master）
+navTitle: Git 合并指南
+category: Git
+order: 1
+description: 功能分支合并到 gray/master 的完整流程
+---
 # Git 合并流程完整指南（合并到 gray / master）
 
 > **适用场景**：功能分支 `feat/xxx` 开发完成后，需先合并到 `gray` 进行测试，测试通过后再合并到 `master` 上线。  
