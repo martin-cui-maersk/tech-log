@@ -35,14 +35,37 @@
             <router-link to="/" class="sidebar-link">前言</router-link>
           </div>
           <!-- 分类与文档由 src/assets/docs 自动扫描生成，新增文件后无需改这里 -->
-          <div v-for="group in categories" :key="group.name" class="sidebar-group">
-            <div class="sidebar-group-title">{{ group.name }}</div>
-            <router-link
-              v-for="doc in group.docs"
-              :key="doc.slug"
-              :to="'/docs/' + doc.slug"
-              class="sidebar-link"
-            >{{ doc.navTitle }}</router-link>
+          <div v-for="(group, index) in categories" :key="group.name" class="sidebar-group">
+            <button
+              type="button"
+              class="sidebar-group-title"
+              :class="{
+                'is-collapsed': isGroupCollapsed(group.name),
+                'is-active': isGroupActive(group)
+              }"
+              :aria-expanded="isGroupCollapsed(group.name) ? 'false' : 'true'"
+              :aria-controls="'sidebar-group-body-' + index"
+              :title="isGroupCollapsed(group.name) ? '展开' + group.name : '收起' + group.name"
+              @click="toggleGroup(group.name)"
+            >
+              <svg class="group-arrow" width="10" height="10" viewBox="0 0 10 10" aria-hidden="true">
+                <path d="M1 3.2 L5 7.2 L9 3.2" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" />
+              </svg>
+              <span class="group-name">{{ group.name }}</span>
+              <span class="group-count">{{ group.docs.length }}</span>
+            </button>
+            <div
+              :id="'sidebar-group-body-' + index"
+              class="sidebar-group-body"
+              :class="{ 'is-collapsed': isGroupCollapsed(group.name) }"
+            >
+              <router-link
+                v-for="doc in group.docs"
+                :key="doc.slug"
+                :to="'/docs/' + doc.slug"
+                class="sidebar-link"
+              >{{ doc.navTitle }}</router-link>
+            </div>
           </div>
         </div>
       </aside>
@@ -57,6 +80,7 @@
 import { categories } from '@/utils/docRegistry'
 
 const STORAGE_KEY = 'tech-log:sidebar-open'
+const GROUPS_STORAGE_KEY = 'tech-log:collapsed-groups'
 
 function readSidebarPreference () {
   let saved = null
@@ -75,16 +99,28 @@ function readSidebarPreference () {
   return window.innerWidth > 1080
 }
 
+function readCollapsedGroups () {
+  try {
+    const saved = JSON.parse(window.localStorage.getItem(GROUPS_STORAGE_KEY) || '[]')
+    return Array.isArray(saved) ? saved.filter(name => typeof name === 'string') : []
+  } catch (e) {
+    return []
+  }
+}
+
 export default {
   name: 'App',
   data () {
     return {
       categories: categories,
-      sidebarOpen: true
+      sidebarOpen: true,
+      // 被折叠起来的分类名，例如 ['MySQL', 'Hyperf']
+      collapsedGroups: []
     }
   },
   created () {
     this.sidebarOpen = readSidebarPreference()
+    this.collapsedGroups = readCollapsedGroups()
   },
   watch: {
     // 窄屏时侧边栏是浮层，点了文档就自动收起，避免挡住正文
@@ -104,6 +140,29 @@ export default {
         window.localStorage.setItem(STORAGE_KEY, open ? '1' : '0')
       } catch (e) {
         // 隐私模式下 localStorage 不可用，忽略即可
+      }
+    },
+    isGroupCollapsed (name) {
+      return this.collapsedGroups.indexOf(name) !== -1
+    },
+    // 当前正在看的文档属于这个分类时，标题高亮，折叠起来也能知道自己在哪
+    isGroupActive (group) {
+      const current = this.$route.params.doc
+      return Boolean(current) && group.docs.some(doc => doc.slug === current)
+    },
+    toggleGroup (name) {
+      const next = this.collapsedGroups.slice()
+      const index = next.indexOf(name)
+      if (index === -1) {
+        next.push(name)
+      } else {
+        next.splice(index, 1)
+      }
+      this.collapsedGroups = next
+      try {
+        window.localStorage.setItem(GROUPS_STORAGE_KEY, JSON.stringify(next))
+      } catch (e) {
+        // 同上
       }
     }
   }
@@ -292,14 +351,86 @@ body {
   margin-bottom: 24px;
 }
 
+/* 分类标题：整行都是按钮，点一下折叠/展开该分类下的文档 */
 .sidebar-group-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 24px;
+  margin-bottom: 4px;
+  font-family: inherit;
   font-size: 12px;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.5px;
+  text-align: left;
   color: var(--content-text-light);
-  padding: 8px 24px;
-  margin-bottom: 4px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  transition: color 0.2s, background-color 0.2s;
+}
+
+.sidebar-group-title:hover {
+  color: var(--theme-color);
+  background-color: rgba(62, 175, 124, 0.06);
+}
+
+.sidebar-group-title:focus-visible {
+  outline: 2px solid var(--theme-color);
+  outline-offset: -2px;
+}
+
+/* 当前文档所在的分类：标题高亮，折叠起来也能知道自己在哪 */
+.sidebar-group-title.is-active {
+  color: var(--theme-color);
+}
+
+.group-arrow {
+  flex: none;
+  transition: transform 0.2s ease;
+}
+
+.sidebar-group-title.is-collapsed .group-arrow {
+  transform: rotate(-90deg);
+}
+
+.group-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.group-count {
+  flex: none;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--content-text-light);
+  background-color: rgba(0, 0, 0, 0.05);
+  border-radius: 9px;
+  padding: 1px 7px;
+}
+
+.sidebar-group-body.is-collapsed {
+  display: none;
+}
+
+.sidebar-group-body:not(.is-collapsed) {
+  animation: sidebarGroupIn 0.18s ease;
+}
+
+@keyframes sidebarGroupIn {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
 }
 
 .sidebar-link {
