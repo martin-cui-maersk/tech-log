@@ -69,7 +69,17 @@ slug: git-merge            # 自定义访问地址（默认用文件名）
 - 当前正在看的文档所属分类，标题会高亮成主题色；即使它是折叠状态，也能知道自己在哪个分类里。
 - 点导航栏左上角的按钮收起 / 展开**整条侧边栏**；收起后正文占满整屏并居中。
 - 整条侧边栏的状态存在 `tech-log:sidebar-open` 里。
-- 窄屏（≤ 1080px）首次访问默认收起；此时侧边栏是浮层，点开、选中一篇文档后会自动收起。
+- 窄屏（≤ 1080px）下侧边栏是浮层，**无论之前选过什么都默认收起**；点开、选中一篇文档后会自动收起。
+
+## 主题（浅色 / 深色）
+
+- 导航栏右上角的按钮切换浅色 / 深色，图标表示「将要切到的模式」：浅色时显示月亮，深色时显示太阳。
+- 首次访问跟随系统 `prefers-color-scheme`；用户点过切换按钮后，选择记在 `localStorage` 的 `tech-log:theme`，之后不再跟随系统。
+- 想恢复「跟随系统」：`localStorage.removeItem('tech-log:theme')` 后刷新。
+- 主题通过 `<html data-theme="light|dark">` 生效：
+  - 颜色变量都在 [src/App.vue](src/App.vue) 的 `:root`（浅色）和 `html[data-theme='dark']`（深色）里；
+  - 新增样式请用变量（例如 `var(--surface-2)`、`var(--heading-text)`），不要写死颜色，否则深色模式下会不协调；
+  - [index.html](index.html) 里有一段内联脚本，在首屏渲染前就设好 `data-theme`，避免深色模式刷新时闪白；它用的 localStorage key 必须和 [src/utils/theme.js](src/utils/theme.js) 一致。
 
 ## 构建
 

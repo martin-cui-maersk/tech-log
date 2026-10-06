@@ -39,8 +39,10 @@
         <h3>{{ group.name }}</h3>
         <ul class="doc-list">
           <li v-for="doc in group.docs" :key="doc.slug">
-            <router-link :to="'/docs/' + doc.slug">{{ doc.title }}</router-link>
-            <span v-if="doc.description" class="doc-desc"> - {{ doc.description }}</span>
+            <router-link :to="'/docs/' + doc.slug" class="doc-card">
+              <span class="doc-title">{{ doc.title }}</span>
+              <span v-if="doc.description" class="doc-desc">{{ doc.description }}</span>
+            </router-link>
           </li>
         </ul>
       </div>
@@ -69,22 +71,38 @@ export default {
 }
 
 .hero {
+  position: relative;
   text-align: center;
-  padding: 60px 0 40px;
+  padding: 62px 0 44px;
   border-bottom: 1px solid var(--border-color);
   margin-bottom: 40px;
 }
 
+/* 标题后面一层很淡的绿色光晕 */
+.hero::before {
+  content: '';
+  position: absolute;
+  top: -30px;
+  left: 50%;
+  width: 460px;
+  height: 220px;
+  transform: translateX(-50%);
+  background: radial-gradient(closest-side, var(--theme-color-soft), transparent 75%);
+  pointer-events: none;
+}
+
 .hero-title {
+  position: relative;
   font-size: 42px;
   font-weight: 700;
-  color: var(--content-text);
+  color: var(--heading-text);
   margin-bottom: 12px;
   letter-spacing: -1px;
 }
 
 .hero-subtitle {
-  font-size: 18px;
+  position: relative;
+  font-size: 17px;
   color: var(--content-text-light);
 }
 
@@ -93,8 +111,9 @@ export default {
 }
 
 .info-section h2 {
-  font-size: 22px;
-  font-weight: 600;
+  font-size: 21px;
+  font-weight: 650;
+  color: var(--heading-text);
   margin-bottom: 16px;
   padding-bottom: 8px;
   border-bottom: 1px solid var(--border-color);
@@ -102,64 +121,94 @@ export default {
 
 .info-section p {
   margin: 8px 0;
-  line-height: 1.8;
+  line-height: 1.85;
   color: var(--content-text);
 }
 
 .version-table {
   width: 100%;
-  border-collapse: collapse;
+  border-collapse: separate;
+  border-spacing: 0;
   font-size: 14px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  box-shadow: var(--shadow-sm);
 }
 
 .version-table th,
 .version-table td {
-  border: 1px solid var(--border-color);
   padding: 10px 14px;
   text-align: left;
+  border-bottom: 1px solid var(--border-color);
 }
 
 .version-table th {
-  background-color: #f6f8fa;
+  background-color: var(--surface-2);
+  color: var(--heading-text);
   font-weight: 600;
+}
+
+.version-table tr:last-child td {
+  border-bottom: none;
 }
 
 .doc-group {
-  margin-bottom: 24px;
+  margin-bottom: 26px;
 }
 
 .doc-group h3 {
-  font-size: 15px;
+  font-size: 12px;
   font-weight: 600;
   color: var(--content-text-light);
   text-transform: uppercase;
-  letter-spacing: 0.5px;
-  margin-bottom: 8px;
+  letter-spacing: 0.6px;
+  margin-bottom: 10px;
 }
 
 .doc-list {
   list-style: none;
   padding: 0;
+  display: grid;
+  gap: 10px;
 }
 
-.doc-list li {
-  padding: 8px 0;
-  line-height: 1.8;
-}
-
-.doc-list a {
-  color: var(--link-color);
+/* 每篇文档一张可点的小卡片 */
+.doc-card {
+  display: block;
+  padding: 12px 16px;
+  background-color: var(--content-bg);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
   text-decoration: none;
-  font-weight: 500;
+  transition: border-color 0.2s, box-shadow 0.2s, transform 0.2s, background-color 0.2s;
 }
 
-.doc-list a:hover {
-  text-decoration: underline;
+.doc-card:hover {
+  border-color: var(--theme-color);
+  box-shadow: var(--shadow-md);
+  transform: translateY(-2px);
+}
+
+.doc-title {
+  display: block;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--heading-text);
+  transition: color 0.2s;
+}
+
+.doc-card:hover .doc-title {
+  color: var(--link-color);
 }
 
 .doc-desc {
+  display: block;
+  margin-top: 5px;
+  font-size: 13px;
+  line-height: 1.65;
   color: var(--content-text-light);
-  font-size: 14px;
 }
 
 .empty-tip {

@@ -1,9 +1,30 @@
 <!DOCTYPE html>
-<html>
+<html lang="zh-CN">
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width,initial-scale=1.0">
-    <title>tech-log</title>
+    <title>技术随笔</title>
+    <meta name="description" content="个人技术学习笔记与文档">
+    <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+    <meta name="theme-color" content="#161b22" media="(prefers-color-scheme: dark)">
+    <style>
+      html { background-color: #ffffff; }
+      html[data-theme='dark'] { background-color: #1c2128; }
+    </style>
+    <script>
+      (function () {
+        var theme
+        try {
+          theme = localStorage.getItem('tech-log:theme')
+          if (theme !== 'light' && theme !== 'dark') {
+            theme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
+          }
+        } catch (e) {
+          theme = 'light'
+        }
+        document.documentElement.setAttribute('data-theme', theme)
+      })()
+    </script>
   </head>
   <body>
     <div id="app"></div>
