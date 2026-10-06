@@ -183,14 +183,95 @@ ALTER TABLE orders ADD INDEX idx_cover (user_id, status, created_at, amount);
 
 代价是索引变大、写入变慢，**不要为了覆盖而把所有列都塞进索引**。
 
-### 3.4 其他要点
+### 3.4 区分度（选择性）
+
+**区分度 = 不重复的值个数 ÷ 总行数**，越接近 1 越好。它决定的是「这个索引值不值得建」，是索引设计里最容易被忽略、又最影响结果的一步。
 
 ```sql
--- 前缀索引：长字符串列（注意不能用于覆盖索引，也不能用于 ORDER BY）
-ALTER TABLE users ADD INDEX idx_email (email(20));
+-- 先算候选列的区分度，再决定建不建
+SELECT COUNT(DISTINCT status)   / COUNT(*) AS status_sel,
+       COUNT(DISTINCT user_id)  / COUNT(*) AS user_id_sel,
+       COUNT(DISTINCT order_no) / COUNT(*) AS order_no_sel
+FROM orders;
 
--- 区分度：太低（如性别、状态只有几个值）的列单独建索引基本无用
-SELECT COUNT(DISTINCT status) / COUNT(*) AS selectivity FROM orders;
+-- status_sel   = 0.0000004  （只有 5 个状态）→ 单独建索引没意义
+-- user_id_sel  = 0.31                        → 适合建（更适合进联合索引）
+-- order_no_sel = 1.0         （业务唯一）     → 最好的索引候选
+```
+
+经验判断（快速筛选用，最终还是要看 `EXPLAIN` 和实测耗时）：
+
+| 区分度 | 判断 | 处理方式 |
+| --- | --- | --- |
+| > 0.5 | 很好 | 单列索引就能过滤掉大部分数据 |
+| 0.1 ～ 0.5 | 一般 | 可以单独建，更推荐和其它列组成联合索引 |
+| 0.01 ～ 0.1 | 偏弱 | 别单独建；放进联合索引当配角，或做成覆盖索引 |
+| < 0.01（性别、状态、is_deleted） | 极弱 | 单独建索引基本不会被优化器选中 |
+
+**为什么低区分度单独建索引会"建了也用不上"**：假设 `status` 有 5 个值、表 1000 万行，查 `status = 1` 大约命中 200 万行。走二级索引要先扫这 200 万条索引记录，再回表 200 万次随机读；而全表扫描是顺序读。优化器算完成本后会直接选 `type: ALL` —— 不是索引坏了，是走索引更贵。
+
+**但有三个例外，别把结论用死：**
+
+1. **低区分度列放进联合索引仍然有用**。`(status, created_at)` 里 `status` 只把范围缩小到 1/5，但配合 `created_at` 的范围条件后能定位到很小区间；`(user_id, status)` 里 `status` 只是配角，作用是让等值条件被索引完全覆盖。
+
+2. **只取聚合值 / 覆盖索引时，低区分度索引也可能被选中**，因为索引比表窄、扫描代价更低：
+
+   ```sql
+   ALTER TABLE orders ADD INDEX idx_status (status);
+   EXPLAIN SELECT COUNT(*) FROM orders WHERE status = 1;
+   -- type: index（扫整个索引但不回表），Extra: Using where; Using index
+   ```
+
+3. **数据倾斜时平均区分度会骗人**。某列整体区分度很高，但个别值占了大部分数据（例如 `city` 里"北京"占 40%）：查热门值走索引反而更慢，查冷门值很快。这种情况 8.0 可以建直方图，让优化器知道真实分布：
+
+   ```sql
+   ANALYZE TABLE orders UPDATE HISTOGRAM ON city, status WITH 64 BUCKETS;
+   ```
+
+**联合索引的顺序怎么和区分度配合：**
+
+- 等值条件里，**区分度高的列放前面**；
+- 范围条件、排序列放后面（它们的位置由语义决定，不参与区分度排序）；
+- 不能只看单列的区分度，要看**组合后的区分度**：
+
+```sql
+-- status 单列区分度极低，但和 user_id 组合后完全够用
+SELECT COUNT(DISTINCT status, user_id) / COUNT(*) AS combo_sel,
+       COUNT(DISTINCT status)          / COUNT(*) AS status_sel
+FROM orders;
+```
+
+**`Cardinality` 是估算值，不能用它判断区分度：**
+
+```sql
+SHOW INDEX FROM orders;             -- 看 Cardinality 列（InnoDB 随机采样估算，偏差可能很大）
+
+SELECT * FROM information_schema.statistics   -- 同样的数据，方便批量对比
+WHERE table_schema = 'your_db' AND table_name = 'orders';
+
+ANALYZE TABLE orders;               -- 统计信息过期会导致选错索引，可以手动刷新
+```
+
+评估「值不值得建索引」要用 `COUNT(DISTINCT)` 的真实值，不要拿 `SHOW INDEX` 的 `Cardinality` 当依据。
+
+**长字符串列建前缀索引时，也用区分度来挑长度：**
+
+```sql
+-- 找出"能保留大部分区分度"的最短前缀：p15 已接近全列区分度，就用 15
+SELECT COUNT(DISTINCT LEFT(email, 5))  / COUNT(*) AS p5,
+       COUNT(DISTINCT LEFT(email, 10)) / COUNT(*) AS p10,
+       COUNT(DISTINCT LEFT(email, 15)) / COUNT(*) AS p15,
+       COUNT(DISTINCT email)           / COUNT(*) AS full_sel
+FROM users;
+```
+
+一句话总结：**先把最终查询条件的组合区分度算出来，再决定建不建、几列、谁在前；区分度 < 0.01 的列不要单独建索引。**区分度只是快速筛选手段，`WHERE` 里高频出现的列、参与排序/分组/JOIN 的列即使区分度一般也值得建，最终以 `EXPLAIN` 和实测为准。
+
+### 3.5 其他要点
+
+```sql
+-- 前缀索引：长字符串列（前缀长度按区分度挑，见 3.4；注意不能用于覆盖索引和 ORDER BY）
+ALTER TABLE users ADD INDEX idx_email (email(20));
 
 -- 8.0：函数索引 / 降序索引
 ALTER TABLE orders ADD INDEX idx_date ((DATE(created_at)));
@@ -410,6 +491,7 @@ ALTER TABLE orders ADD INDEX idx_cover (user_id, status, created_at, amount);
 - [ ] 没有 `SELECT *`、没有隐式类型转换、没有在索引列上做函数运算
 - [ ] 深分页已处理（游标分页或延迟关联）
 - [ ] 新加的索引在 `sys.schema_redundant_indexes` 里没有重复项
+- [ ] 新索引的列算过区分度：区分度 < 0.01 的列没有单独建索引，联合索引里区分度高的等值列在前（见 3.4）
 - [ ] 大表 DDL 用了在线工具或 `ALGORITHM=INPLACE, LOCK=NONE`
 - [ ] `ANALYZE TABLE` 更新过统计信息
 - [ ] 删除索引前先 `INVISIBLE` 观察一段时间
