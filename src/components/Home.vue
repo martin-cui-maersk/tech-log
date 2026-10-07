@@ -7,7 +7,7 @@
 
     <div class="info-section">
       <h2>前言</h2>
-      <p>这里记录了我在技术学习过程中的心得、笔记和文档。主要涵盖 Git、MySQL、PHP、Hyperf、网络、设计模式等技术领域。</p>
+      <p>这里记录了我在技术学习过程中的心得、笔记和文档。主要涵盖 Git、MySQL、PHP、Hyperf、网络、设计模式、算法、Redis、Docker、Linux 等技术领域。</p>
       <p>所有文档均为个人总结，如有错误欢迎指出。</p>
     </div>
 
@@ -22,6 +22,11 @@
           </tr>
         </thead>
         <tbody>
+          <tr>
+            <td>v1.2.0</td>
+            <td>2026-10-06</td>
+            <td>新增算法、Redis、Docker、Linux 四篇文档</td>
+          </tr>
           <tr>
             <td>v1.1.0</td>
             <td>2026-10-06</td>

@@ -1,0 +1,353 @@
+---
+title: Redis 缓存实战：一致性、三大缓存问题与调优
+navTitle: Redis 缓存实战
+category: Redis
+order: 9
+description: 数据结构选型、Cache Aside 一致性、穿透/击穿/雪崩、大 key 热 key、过期淘汰、分布式锁与排查命令
+---
+# Redis 缓存实战：一致性、三大缓存问题与调优
+
+> **适用场景**：缓存和数据库不一致、热点 key 一过期就打满数据库、Redis 内存莫名打满、大 key 导致卡顿、分布式锁偶发失效。
+> **一句话原则**：Redis 是**单线程**的，任何 `O(n)` 命令都会卡住所有人；缓存的核心难点不是"怎么存"，而是**过期与一致性**。
+
+## 目录
+
+- [1. 数据结构与选型](#1-数据结构与选型)
+- [2. 缓存模式与一致性](#2-缓存模式与一致性)
+- [3. 穿透、击穿、雪崩](#3-穿透击穿雪崩)
+- [4. 大 key 与热 key](#4-大-key-与热-key)
+- [5. 过期与内存淘汰](#5-过期与内存淘汰)
+- [6. 持久化与高可用](#6-持久化与高可用)
+- [7. 分布式锁](#7-分布式锁)
+- [8. 性能与排查命令](#8-性能与排查命令)
+- [9. 上线检查清单](#9-上线检查清单)
+
+---
+
+## 1. 数据结构与选型
+
+| 结构 | 典型用途 | 注意 |
+| --- | --- | --- |
+| String | 对象缓存、计数器（`INCR`）、分布式锁、Bitmap | 大对象要压缩；计数用 `INCR` 而非读改写 |
+| Hash | 对象的字段级读写（`HSET user:1 name x`） | 字段很多时是"大 key"，要分片 |
+| List | 简单队列、最新 N 条（`LPUSH` + `LTRIM`） | 全量 `LRANGE` 会阻塞 |
+| Set | 去重、交并差（共同好友、标签筛选） | `SMEMBERS` 大集合慎用，用 `SSCAN` |
+| ZSet | 排行榜、延时队列（score = 时间戳）、范围查询 | 排行榜只取 TopN 用 `ZREVRANGE 0 9` |
+| Bitmap | 签到、活跃统计（`SETBIT` / `BITCOUNT`） | 按用户 ID 直接映射位，ID 太大会浪费空间 |
+| HyperLogLog | UV 估算（误差 ~0.81%） | 只估算基数，不能取明细 |
+| Stream | 消息队列（5.0+，支持消费组、ACK） | 需要 `XACK` + `XTRIM`，否则一直涨 |
+
+```bash
+# 内存编码：小对象用 listpack/ziplist 更省内存，超阈值会自动转成 hashtable/skiplist
+redis-cli config get 'hash-max-*'      # 7.0 起叫 listpack，老的叫 ziplist
+redis-cli config get 'zset-max-*'
+redis-cli object encoding user:1       # 看实际编码
+```
+
+**选型口诀**：要原子计数用 String，要字段级更新用 Hash，要排序/范围用 ZSet，要估算基数用 HyperLogLog，要可靠消费用 Stream。
+
+---
+
+## 2. 缓存模式与一致性
+
+### 2.1 Cache Aside（最常用）
+
+```php
+function getUser(int $id): array
+{
+    $key = "user:{$id}";
+    $cached = $redis->get($key);
+    if ($cached !== false) {
+        return json_decode($cached, true);
+    }
+    $user = $db->query('SELECT * FROM users WHERE id = ?', [$id]);
+    if ($user) {
+        // 过期时间加随机抖动，避免同一批 key 同时失效
+        $ttl = 1800 + random_int(0, 300);
+        $redis->setex($key, $ttl, json_encode($user));
+    } else {
+        $redis->setex($key, 60, '');   // 缓存空值，防穿透（短 TTL）
+    }
+    return $user ?: [];
+}
+
+function updateUser(int $id, array $data): void
+{
+    $db->update('users', $data, ['id' => $id]);
+    $redis->del("user:{$id}");         // 删缓存，而不是更新缓存
+}
+```
+
+### 2.2 为什么是"删除"而不是"更新"
+
+| 方案 | 问题 |
+| --- | --- |
+| 更新数据库 + 更新缓存 | 并发写时两个请求的写入顺序可能颠倒 → 缓存里是旧值；而且很多更新根本不会被读到，白算一次 |
+| 更新数据库 + **删除**缓存 | 下次读时按需回填，逻辑简单、天然幂等（推荐） |
+
+### 2.3 删除缓存的时序
+
+```
+① 先更新 DB，再删缓存（推荐）
+   A: update DB → delete cache
+   并发下仍可能：B 在 A 删除前读到了旧值并回填 → 脏数据（窗口极小，靠 TTL 兜底）
+
+② 先删缓存，再更新 DB（不推荐）
+   删除后、DB 更新前，读请求会把旧值重新写回缓存 → 脏数据存留时间长
+```
+
+要求更强一致就上**延迟双删**或订阅 binlog：
+
+```php
+function updateUserSafely(int $id, array $data): void
+{
+    $redis->del("user:{$id}");          // 1. 先删一次
+    $db->update('users', $data, ['id' => $id]);  // 2. 更新 DB
+    // 3. 延迟再删一次：覆盖"读请求在窗口期回填的旧值"
+    //    生产上用延时队列/定时任务，别在请求里 sleep
+    $delayQueue->push(['key' => "user:{$id}"], 500);
+}
+```
+
+更彻底的做法是**订阅 MySQL binlog（Canal/Debezium）→ 投递到队列 → 消费者删缓存**，把一致性收敛到最终一致，且业务代码零侵入。
+
+**判断标准**：余额、库存这类强一致数据不要走缓存；能接受"最多 TTL 秒的旧值"再上缓存。
+
+---
+
+## 3. 穿透、击穿、雪崩
+
+| 问题 | 现象 | 解决 |
+| --- | --- | --- |
+| **穿透** | 查不存在的数据，缓存永远不命中，每次都打到 DB | 缓存空值（短 TTL）、布隆过滤器、参数合法性校验 |
+| **击穿** | 单个热点 key 过期瞬间，大量请求同时打到 DB | 互斥锁重建、逻辑过期（不设 TTL，后台异步刷新） |
+| **雪崩** | 大量 key 同时过期，或 Redis 整体不可用 | TTL 加随机、多级缓存、限流熔断、集群高可用 |
+
+### 3.1 击穿：互斥锁重建
+
+```php
+function getHotData(string $key): ?array
+{
+    $cached = $redis->get($key);
+    if ($cached !== false) {
+        return json_decode($cached, true);
+    }
+    // 只让一个请求去重建，其它请求短暂等待后重试
+    $lockKey = "lock:{$key}";
+    $token = bin2hex(random_bytes(8));
+    if ($redis->set($lockKey, $token, ['nx', 'ex' => 10])) {
+        try {
+            $data = loadFromDb($key);
+            $redis->setex($key, 1800 + random_int(0, 300), json_encode($data));
+            return $data;
+        } finally {
+            // Lua 保证"判断是自己的锁 + 删除"是原子的
+            $redis->eval(
+                "if redis.call('get', KEYS[1]) == ARGV[1] then return redis.call('del', KEYS[1]) else return 0 end",
+                [$lockKey, $token],
+                1
+            );
+        }
+    }
+    usleep(50_000);            // 等 50ms 再读一次缓存
+    $cached = $redis->get($key);
+    return $cached !== false ? json_decode($cached, true) : null;
+}
+```
+
+### 3.2 逻辑过期：热点 key 永不失效
+
+把过期时间**写在 value 里**，Redis 层面不设 TTL：
+
+```php
+// value = ['data' => [...], 'expire_at' => 1730000000]
+$row = json_decode($redis->get($key) ?: 'null', true);
+if ($row && $row['expire_at'] > time()) {
+    return $row['data'];                    // 没过期，直接返回
+}
+// 已逻辑过期：先返回旧值保证可用性，再丢异步任务去刷新
+if ($row) {
+    $asyncQueue->push(['refresh', $key]);
+    return $row['data'];
+}
+// 连旧值都没有，才走同步加载
+```
+
+**好处**：没有"同时失效"的尖峰；**代价**：会短暂返回旧数据，适合允许最终一致的场景（首页、榜单）。
+
+### 3.3 布隆过滤器
+
+```bash
+# 原生 BF.* 命令需要 RedisBloom 模块（Redis Stack 自带）
+redis-cli BF.RESERVE user_filter 0.001 1000000   # 误判率 0.1%，容量 100 万
+redis-cli BF.ADD user_filter 1001
+redis-cli BF.EXISTS user_filter 1001
+```
+
+没有模块时，可以用 Bitmap 手写或用 `SET` 兜底；要点：**布隆过滤器只能判断"一定不存在"，不能判断"一定存在"**，所以命中的请求仍要查缓存/DB。
+
+---
+
+## 4. 大 key 与热 key
+
+### 4.1 判定与危害
+
+| 类型 | 经验阈值 | 危害 |
+| --- | --- | --- |
+| String | > 10 KB | 网络传输、序列化开销 |
+| Hash/List/Set/ZSet | 元素 > 5000，或总大小 > 1 MB | 单命令 `O(n)` 阻塞主线程、删除卡顿 |
+
+大 key 会**阻塞单线程**（`HGETALL`/`DEL` 期间所有请求排队），也会让主从复制、持久化变慢。
+
+### 4.2 怎么找
+
+```bash
+redis-cli --bigkeys                 # 基于 SCAN 的采样统计（对线上安全）
+redis-cli --memkeys                 # 看内存占用最大的 key
+redis-cli memory usage user:1001    # 单个 key 的内存（4.0+）
+redis-cli --hotkeys                 # 热 key，需要 maxmemory-policy 为 *lfu
+redis-cli info memory | grep used_memory_human
+```
+
+### 4.3 怎么处理
+
+```bash
+# 删除大 key：用 UNLINK 异步删除，别用 DEL
+redis-cli unlink big:hash
+
+# 分批删除集合元素，避免一次性阻塞
+redis-cli --eval delBigHash.lua big:hash , 100
+```
+
+```php
+// 拆分：把一个大 Hash 按业务维度分片
+$shard = $userId % 16;
+$key = "cart:{$shard}";             // 每个分片不超过几千个字段
+$redis->hset($key, (string) $userId, json_encode($cart));
+```
+
+热 key（单 key QPS 极高）的解法：**本地缓存**（进程内 LRU，几十毫秒过期）+ 多副本 key 打散（`key:{1..16}` 随机取一个）+ 限流。
+
+---
+
+## 5. 过期与内存淘汰
+
+Redis 的过期删除是**惰性删除 + 定期抽样删除**：不保证"到点立刻消失"，所以内存会略高于预期。
+
+```ini
+maxmemory 4gb
+maxmemory-policy allkeys-lfu      # 推荐纯缓存场景：优先淘汰最不常用的
+# 可选：noeviction（不淘汰，写入报错）/ allkeys-lru / volatile-lru / volatile-ttl / allkeys-random
+maxmemory-samples 5               # 提高采样数更接近真实 LRU/LFU，代价是 CPU
+lfu-log-factor 10
+lfu-decay-time 1                  # LFU 计数器衰减（分钟）
+```
+
+| 策略 | 说明 | 适用 |
+| --- | --- | --- |
+| `noeviction` | 内存满时写入报错 | 当"数据库"用、不能丢数据 |
+| `allkeys-lru` | 所有 key 里淘汰最久未使用 | 通用缓存 |
+| `allkeys-lfu` | 淘汰访问频率最低（4.0+） | 有明显热点、长尾访问的场景 |
+| `volatile-lru` / `volatile-ttl` | 只在设了 TTL 的 key 里淘汰 | 同一实例混存缓存与持久数据 |
+
+**TTL 设计三条**：必设过期时间（除逻辑过期的热点）、TTL 加随机抖动、批量预热时错开时间。
+
+---
+
+## 6. 持久化与高可用
+
+| 方案 | 原理 | 特点 |
+| --- | --- | --- |
+| RDB | fork 子进程写快照（COW） | 文件小、恢复快；两次快照之间的数据会丢 |
+| AOF | 追加写命令，`appendfsync everysec` | 最多丢 1 秒；文件大、恢复慢 |
+| 混合（4.0+） | `aof-use-rdb-preamble yes` | RDB 头 + 增量 AOF，兼顾恢复速度与安全性 |
+
+```ini
+appendonly yes
+appendfsync everysec
+auto-aof-rewrite-percentage 100
+save 900 1
+save 300 10
+```
+
+- **主从**：异步复制，全量同步（RDB）→ 增量（`repl-backlog`）；从库只读 `replica-read-only yes`；
+- **哨兵**：监控 + 自动故障转移，`quorum` 决定判定下线所需的票数；客户端要支持哨兵地址发现；
+- **Cluster**：16384 个 slot 分片，客户端收到 `MOVED`/`ASK` 要重定向；**多 key 操作必须同 slot**，用 `{tag}` 强制：
+
+```bash
+# 用 hash tag 让这两个 key 落在同一个 slot
+SET {user:1}:name Tom
+SET {user:1}:age  20
+MGET {user:1}:name {user:1}:age     # 这样才能在 Cluster 里执行
+```
+
+---
+
+## 7. 分布式锁
+
+```php
+// 加锁：NX 保证互斥，PX 防死锁，value 用唯一值区分持有者
+$token = bin2hex(random_bytes(16));
+$ok = $redis->set("lock:order:{$id}", $token, ['nx', 'px' => 30000]);
+
+// 解锁：必须用 Lua 比对 value，否则可能删掉别人的锁
+$redis->eval(
+    "if redis.call('get', KEYS[1]) == ARGV[1] then return redis.call('del', KEYS[1]) else return 0 end",
+    ["lock:order:{$id}", $token],
+    1
+);
+```
+
+四个必须处理的点：
+
+1. **锁要过期**：否则持锁进程崩了就是死锁；
+2. **value 必须唯一**：只判断 key 是否存在会误删他人的锁；
+3. **业务耗时可能超过锁时间** → 需要看门狗续期（后台定时把 `PEXPIRE` 续上），或用 `Redlock` 的多实例方案；
+4. **Redlock 有争议**：它对"时钟漂移 + GC 停顿"的假设较弱，官方推荐用 **fencing token**（单调递增的版本号，写数据时校验）配合；工程上更稳的做法是**业务幂等 + 数据库唯一约束**，锁只是减少并发，不作为正确性保证。
+
+---
+
+## 8. 性能与排查命令
+
+```bash
+redis-cli --latency                  # 持续测延迟
+redis-cli --latency-history -i 5     # 每 5 秒一段，看抖动
+redis-cli slowlog get 10             # 慢命令（阈值 slowlog-log-slower-than，单位微秒）
+redis-cli config set slowlog-log-slower-than 10000   # >10ms 记录
+redis-cli info stats | grep -E 'instantaneous_ops|keyspace_hits|keyspace_misses'
+redis-cli info clients | grep connected_clients
+redis-cli info memory | grep -E 'used_memory_human|mem_fragmentation_ratio'
+redis-cli client list                # 谁连着、在跑什么命令（排查阻塞）
+redis-cli --scan --pattern 'user:*'  # 用 SCAN 代替 KEYS
+```
+
+三条硬规则：
+
+1. **禁用 `KEYS *`**，用 `SCAN` 游标遍历；
+2. **禁止对未知大小的集合用 `HGETALL`/`SMEMBERS`/`LRANGE 0 -1`**，用 `HSCAN`/`SSCAN` 或分段；
+3. **批量操作用 Pipeline**，把 N 次 RTT 压成 1 次：
+
+```php
+$pipe = $redis->pipeline();
+foreach ($ids as $id) {
+    $pipe->hgetall("user:{$id}");
+}
+$rows = $pipe->exec();
+```
+
+`MONITOR` 会打印所有命令、**严重拖慢线上**，只在短时间排障时用，且记得及时退出。
+
+---
+
+## 9. 上线检查清单
+
+- [ ] 所有缓存都设了 TTL（除逻辑过期的热点数据），且 TTL 带随机抖动
+- [ ] 更新数据的路径是「改 DB → 删缓存」，没有"改 DB → 改缓存"
+- [ ] 热点 key 有防击穿手段（互斥重建或逻辑过期），查不到的数据缓存了空值
+- [ ] 布隆过滤器只用于"挡不存在"，命中后仍会查缓存
+- [ ] `maxmemory` 和 `maxmemory-policy` 配置符合用途（纯缓存建议 `allkeys-lfu`）
+- [ ] 没有 `KEYS *`、没有对未知大小集合的全量读，批量操作用了 Pipeline
+- [ ] `--bigkeys` 定期巡检，大 key 已拆分或改用 `UNLINK` 删除
+- [ ] 分布式锁有唯一 value、Lua 释放、过期时间，关键业务另有幂等/唯一约束兜底
+- [ ] 开了慢日志（`slowlog-log-slower-than`），`--latency` 基线已知
+- [ ] 持久化与高可用方案明确（RDB/AOF 取舍、哨兵或 Cluster、故障转移演练过）
