@@ -64,6 +64,8 @@ slug: git-merge            # 自定义访问地址（默认用文件名）
 
 ## 侧边栏
 
+> 首页不显示侧边栏，下面这些行为都发生在文档页。
+
 - **分类可折叠**：点侧边栏里的分类标题（如 `GIT`、`MYSQL`）就能把它下面的文档收起来，标题左边的箭头会跟着转；标题右侧的数字是文档数量。
 - 折叠的分类会在 `localStorage` 的 `tech-log:collapsed-groups` 里记住，刷新、跳转后保持。
 - 当前正在看的文档所属分类，标题会高亮成主题色；即使它是折叠状态，也能知道自己在哪个分类里。
@@ -105,6 +107,7 @@ slug: git-merge            # 自定义访问地址（默认用文件名）
 机制：
 
 - [build/loaders/doc-body-loader.js](build/loaders/doc-body-loader.js) 把每个 `.md` 编译成 `{ meta, load() }`：`meta`（标题/分类/排序/简介/更新时间）进主包，`load()` 通过 `require.ensure` 从**该文档所属分类**的 chunk 按需取正文（chunk 名由 [src/utils/docMeta.js](src/utils/docMeta.js) 的 `chunkKeyOf` 按目录名或文件名前缀生成，纯中文分类会归到 `docs-misc`）。元信息解析规则构建期和运行期共用一份，不会出现两边推导不一致。
+- 正文走 `./xxx.md?strip` → [build/loaders/doc-body-strip-loader.js](build/loaders/doc-body-strip-loader.js)，**在这里剥掉 front matter**（`?strip` 由 `webpack.base.conf.js` 里的 `oneOf` 分流）。如果直接把整份文件当正文，`---`/`title:` 这些头部会被渲染进正文。
 - markdown-it 只在「渲染正文」和「建搜索索引」时用到，所以改成 [src/utils/markdown.js](src/utils/markdown.js) 里的 `loadMarkdownIt()` 动态 import；同时 `build/webpack.prod.conf.js` 的 `CommonsChunkPlugin` 把它和它的依赖排除出首屏 vendor。
 - 深链接带 `#锚点` 时，路由的 `scrollBehavior` 执行时元素还没渲染，所以 [src/components/DocsView.vue](src/components/DocsView.vue) 在正文渲染完成后（MarkdownViewer 的 `rendered` 事件）再定位一次。
 
@@ -114,6 +117,7 @@ slug: git-merge            # 自定义访问地址（默认用文件名）
 - 卡片、统计数字、按钮指到的文档**全部由文档扫描结果生成**，新增分类或文档后无需改代码；图标在 `src/components/Home.vue` 的 `CATEGORY_ICONS` 里配置，没配置的分类用默认图标。
 - 卡片上的「最近更新」取自该分类下最新一篇文档的更新时间，时间由构建时的 loader 用 `git log -1 --format=%cs -- <文件>` 取（文件还没提交过就退回文件修改时间），不需要手工维护日期。
 - 导航栏右侧有常驻的「**首页**」按钮（窄屏只留图标），当前在首页时会高亮。
+- **首页不显示侧边栏**（正文占满宽度、内容本身限宽 1040px 居中），侧边栏和导航栏左上角的收起按钮只在文档页出现 —— 和参考的文档站一致。
 
 ## 构建
 

@@ -4,6 +4,7 @@
       <div class="nav-container">
         <div class="nav-left">
           <button
+            v-if="showSidebar"
             type="button"
             class="sidebar-toggle"
             id="sidebar-toggle"
@@ -54,8 +55,8 @@
         </div>
       </div>
     </header>
-    <div class="layout" :class="{ 'is-collapsed': !sidebarOpen }">
-      <aside id="app-sidebar" class="sidebar">
+    <div class="layout" :class="{ 'is-collapsed': !sidebarOpen || !showSidebar }">
+      <aside v-if="showSidebar" id="app-sidebar" class="sidebar">
         <div class="sidebar-inner">
           <div class="sidebar-group">
             <div class="sidebar-group-title">首页</div>
@@ -196,6 +197,12 @@ export default {
     window.removeEventListener('scroll', this.handleScroll, { passive: true })
     if (this.stopThemeWatch) {
       this.stopThemeWatch()
+    }
+  },
+  computed: {
+    // 首页不显示侧边栏（和参考的文档站一致：首页全宽，只有文档页有侧边栏）
+    showSidebar () {
+      return this.$route.name !== 'Home'
     }
   },
   watch: {

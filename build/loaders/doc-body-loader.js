@@ -9,7 +9,8 @@
  * 正文按**分类**拆成多个异步 chunk（docs-git / docs-mysql ...），打开某篇文档只下载
  * 它所在分类的正文；搜索需要全部文档时才会把这些 chunk 一起拉下来。
  *
- * 正文用 `!!raw-loader!./文件名` 读取：`!!` 会禁用其它配置的 loader，避免递归调用本 loader。
+ * 正文用 `./文件名?strip` 读取：走 doc-body-strip-loader.js，它会剥掉 front matter，
+ * 只留 markdown 正文（直接把原文件交给 raw-loader 的话，头部会被渲染进正文）。
  */
 const path = require('path')
 const fs = require('fs')
@@ -52,8 +53,8 @@ module.exports = function docBodyLoader (source) {
   meta.updated = lastUpdated(this.resourcePath)
 
   const chunkName = 'docs-' + chunkKeyOf(relative)
-  // 正文请求：相对当前 md 文件自身，子目录也能正确解析
-  const bodyRequest = '!!raw-loader!./' + path.basename(this.resourcePath)
+  // 正文请求：相对当前 md 文件自身，子目录也能正确解析；?strip 交给 strip loader
+  const bodyRequest = './' + path.basename(this.resourcePath) + '?strip'
 
   return [
     'var meta = ' + JSON.stringify(meta) + ';',

@@ -76,10 +76,19 @@ module.exports = {
         }
       },
       {
-        // 文档只把元信息打进主包，正文由 loader 生成的 load() 走异步 chunk
-        // （见 build/loaders/doc-body-loader.js）
+        // 文档的两种加载方式：
+        //   ./xxx.md          -> 元信息 + load()（元信息进主包，见 doc-body-loader.js）
+        //   ./xxx.md?strip    -> 剥掉 front matter 的正文（异步 chunk，见 doc-body-strip-loader.js）
         test: /\.md$/,
-        loader: path.resolve(__dirname, 'loaders/doc-body-loader.js')
+        oneOf: [
+          {
+            resourceQuery: /strip/,
+            loader: path.resolve(__dirname, 'loaders/doc-body-strip-loader.js')
+          },
+          {
+            loader: path.resolve(__dirname, 'loaders/doc-body-loader.js')
+          }
+        ]
       }
     ]
   },
