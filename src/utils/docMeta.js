@@ -201,11 +201,34 @@ function compareDocs (a, b) {
   return a.slug.localeCompare(b.slug)
 }
 
+/**
+ * 正文异步 chunk 的名字：按分类拆包，打开一篇文章只下载它所在分类的正文
+ *
+ * 取"子目录名"或"文件名第一个 '-' 之前的 ASCII 前缀"做 key（都是 ASCII，能直接当文件名）；
+ * 拿不到 ASCII key（比如纯中文目录名）就归到 docs-misc。
+ */
+function chunkKeyOf (filePath) {
+  var relative = String(filePath).replace(/^\.\//, '')
+  var segments = relative.split('/')
+  var fileName = segments.pop().replace(/\.md$/i, '')
+  var dir = segments.join('/')
+
+  var orderPrefix = /^(\d+)[-_.\s]+(.+)$/.exec(fileName)
+  var baseName = (orderPrefix ? orderPrefix[2] : fileName).trim()
+
+  var lastDir = dir ? dir.split('/').filter(Boolean).pop() : ''
+  var prefix = /^([A-Za-z][A-Za-z0-9]*)[-_]/.exec(baseName)
+  var raw = lastDir || (prefix ? prefix[1] : '') || 'misc'
+  var key = String(raw).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')
+  return key || 'misc'
+}
+
 module.exports = {
   CATEGORY_NAMES: CATEGORY_NAMES,
   DEFAULT_CATEGORY: DEFAULT_CATEGORY,
   parseFrontMatter: parseFrontMatter,
   buildMeta: buildMeta,
+  chunkKeyOf: chunkKeyOf,
   compareDocs: compareDocs,
   prettyCategory: prettyCategory,
   sanitizeSlug: sanitizeSlug

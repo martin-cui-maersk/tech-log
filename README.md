@@ -98,21 +98,22 @@ slug: git-merge            # 自定义访问地址（默认用文件名）
 | 产物 | 大小 | 何时加载 |
 | --- | --- | --- |
 | `vendor.js`（vue / vue-router） | ~147 KB | 首屏 |
-| `app.js`（页面、组件、文档**元信息**、搜索逻辑） | ~31 KB | 首屏 |
-| `docs-body.js`（全部文档正文） | ~164 KB | 打开任意文档，或首次搜索时 |
-| `markdown.js`（markdown-it 及其依赖） | ~95 KB | 同上 |
+| `app.js`（页面、组件、文档**元信息**、搜索逻辑） | ~33 KB | 首屏 |
+| `markdown.js`（markdown-it 及其依赖） | ~95 KB | 打开文档，或首次搜索时 |
+| `docs-<分类>.js`（每个分类一个，如 `docs-git` / `docs-mysql`） | 4～35 KB | 打开该分类的文档时；搜索时全部一起加载 |
 
 机制：
 
-- [build/loaders/doc-body-loader.js](build/loaders/doc-body-loader.js) 把每个 `.md` 编译成 `{ meta, load() }`：`meta`（标题/分类/排序/简介）进主包，`load()` 通过 `require.ensure` 从 `docs-body` chunk 按需取正文；元信息解析规则放在 [src/utils/docMeta.js](src/utils/docMeta.js)，构建（loader）和运行（浏览器）共用一份。
+- [build/loaders/doc-body-loader.js](build/loaders/doc-body-loader.js) 把每个 `.md` 编译成 `{ meta, load() }`：`meta`（标题/分类/排序/简介/更新时间）进主包，`load()` 通过 `require.ensure` 从**该文档所属分类**的 chunk 按需取正文（chunk 名由 [src/utils/docMeta.js](src/utils/docMeta.js) 的 `chunkKeyOf` 按目录名或文件名前缀生成，纯中文分类会归到 `docs-misc`）。元信息解析规则构建期和运行期共用一份，不会出现两边推导不一致。
 - markdown-it 只在「渲染正文」和「建搜索索引」时用到，所以改成 [src/utils/markdown.js](src/utils/markdown.js) 里的 `loadMarkdownIt()` 动态 import；同时 `build/webpack.prod.conf.js` 的 `CommonsChunkPlugin` 把它和它的依赖排除出首屏 vendor。
 - 深链接带 `#锚点` 时，路由的 `scrollBehavior` 执行时元素还没渲染，所以 [src/components/DocsView.vue](src/components/DocsView.vue) 在正文渲染完成后（MarkdownViewer 的 `rendered` 事件）再定位一次。
 
 ## 首页
 
-- 首页结构参考 VitePress：**Hero**（大标题 + 一句话 + 「N 篇文档 · M 个分类」+ 「开始阅读」「按分类浏览」两个按钮）+ **分类卡片网格**（图标 / 分类名 / 文档数 / 该分类下的文档列表 / 「开始阅读 →」）。
+- 首页结构参考 VitePress：**Hero**（大标题 + 一句话 + 「N 篇文档 · M 个分类」+ 「开始阅读」「按分类浏览」两个按钮）+ **分类卡片网格**（图标 / 最近更新 / 分类名 / 文档数 / 该分类下的文档列表 / 「开始阅读 →」）。
 - 卡片、统计数字、按钮指到的文档**全部由文档扫描结果生成**，新增分类或文档后无需改代码；图标在 `src/components/Home.vue` 的 `CATEGORY_ICONS` 里配置，没配置的分类用默认图标。
-- 导航栏左侧有常驻的「**首页**」按钮（窄屏只留图标），当前在首页时会高亮。
+- 卡片上的「最近更新」取自该分类下最新一篇文档的更新时间，时间由构建时的 loader 用 `git log -1 --format=%cs -- <文件>` 取（文件还没提交过就退回文件修改时间），不需要手工维护日期。
+- 导航栏右侧有常驻的「**首页**」按钮（窄屏只留图标），当前在首页时会高亮。
 
 ## 构建
 

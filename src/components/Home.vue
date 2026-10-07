@@ -20,7 +20,10 @@
           class="feature-card"
           :to="card.link"
         >
-          <span class="feature-icon" aria-hidden="true">{{ card.icon }}</span>
+          <span class="feature-head">
+            <span class="feature-icon" aria-hidden="true">{{ card.icon }}</span>
+            <span v-if="card.updated" class="feature-updated">最近更新 {{ card.updated }}</span>
+          </span>
           <span class="feature-title">{{ card.name }}</span>
           <span class="feature-meta">{{ card.count }} 篇文档</span>
           <span class="feature-details">{{ card.details }}</span>
@@ -91,6 +94,11 @@ function docDetails (group) {
   return names.length > DETAILS_MAX ? names.slice(0, DETAILS_MAX).trim() + '…' : names
 }
 
+// 分类里最近一次更新的日期（meta.updated 由构建时的 loader 取 git 提交日期）
+function latestUpdated (group) {
+  return group.docs.reduce((latest, doc) => (doc.updated && doc.updated > latest ? doc.updated : latest), '')
+}
+
 export default {
   name: 'Home',
   data () {
@@ -109,6 +117,7 @@ export default {
         icon: CATEGORY_ICONS[group.name] || DEFAULT_ICON,
         count: group.docs.length,
         details: docDetails(group),
+        updated: latestUpdated(group),
         link: '/docs/' + group.docs[0].slug
       }))
     }
@@ -238,9 +247,26 @@ export default {
   transform: translateY(-2px);
 }
 
+.feature-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 32px;
+}
+
 .feature-icon {
   font-size: 26px;
   line-height: 1.2;
+}
+
+.feature-updated {
+  flex: none;
+  padding: 2px 9px;
+  font-size: 11.5px;
+  color: var(--content-text-light);
+  background-color: var(--hover-bg);
+  border-radius: 999px;
 }
 
 .feature-title {
