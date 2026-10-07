@@ -15,6 +15,7 @@
 import { loadAllDocs } from './docRegistry'
 import { loadMarkdownIt } from './markdown'
 import { headingId } from './anchor'
+import { stripFrontMatter } from './docMeta'
 
 const SNIPPET_LENGTH = 120
 const SNIPPET_BEFORE = 36
@@ -63,7 +64,8 @@ function makeItem (doc, heading, anchor, text) {
 function buildIndex (loaded, md) {
   const items = []
   loaded.forEach(({ meta, content }) => {
-    const html = md.render(content)
+    // 兜底剥掉 front matter，别让 title/navTitle 这些头部进入索引
+    const html = md.render(stripFrontMatter(content))
     const headingRe = /<h([1-4])[^>]*>([\s\S]*?)<\/h\1>/g
     const marks = []
     let match

@@ -5,6 +5,7 @@
 <script>
 import { loadMarkdownIt } from '@/utils/markdown'
 import { headingId } from '@/utils/anchor'
+import { stripFrontMatter } from '@/utils/docMeta'
 
 function addAnchorIds (html) {
   return html.replace(/<h([1-6])>(.*?)<\/h\1>/g, (match, level, text) => {
@@ -42,7 +43,8 @@ export default {
       loadMarkdownIt().then(md => {
         // 渲染期间内容可能已经切换成别的文档
         if (this.content === content) {
-          this.renderedContent = addAnchorIds(md.render(content))
+          // 兜底再剥一次 front matter：正常构建路径已经在 loader 里剥过了
+          this.renderedContent = addAnchorIds(md.render(stripFrontMatter(content)))
           // 通知父组件"内容真的进 DOM 了"，便于深链接的 #锚点定位
           this.$nextTick(() => this.$emit('rendered'))
         }

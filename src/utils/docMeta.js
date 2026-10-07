@@ -223,10 +223,20 @@ function chunkKeyOf (filePath) {
   return key || 'misc'
 }
 
+/**
+ * 剥掉开头的 front matter，只返回正文
+ * 构建时（doc-body-strip-loader）和运行时（MarkdownViewer / 搜索索引）都会调用，
+ * 双保险：即使某个构建路径忘了剥，页面上也不会出现 `--- title: ... ---`
+ */
+function stripFrontMatter (raw) {
+  return parseFrontMatter(String(raw)).body.trim()
+}
+
 module.exports = {
   CATEGORY_NAMES: CATEGORY_NAMES,
   DEFAULT_CATEGORY: DEFAULT_CATEGORY,
   parseFrontMatter: parseFrontMatter,
+  stripFrontMatter: stripFrontMatter,
   buildMeta: buildMeta,
   chunkKeyOf: chunkKeyOf,
   compareDocs: compareDocs,
