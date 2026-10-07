@@ -7,7 +7,7 @@ description: 功能分支合并到 gray/master 的完整流程
 ---
 # Git 合并流程完整指南（合并到 gray / master）
 
-> **适用场景**：功能分支 `feat/xxx` 开发完成后，需先合并到 `gray` 进行测试，测试通过后再合并到 `master` 上线。  
+> **适用场景**：功能分支 `feat/xxx` 开发完成后，需先合并到 `gray` 进行测试，测试通过后再合并到 `master` 上线。
 > **核心要求**：所有合并操作**必须产生合并提交（merge commit）**，便于追溯和回滚。
 
 ---
@@ -30,6 +30,10 @@ description: 功能分支合并到 gray/master 的完整流程
 - [6. 验证合并结果（查看干净的主线历史）](#6-验证合并结果查看干净的主线历史)
 - [7. 快速命令清单（速查）](#7-快速命令清单速查)
 - [8. 注意事项](#8-注意事项)
+- [9. GitLab 受保护分支与非保护分支冲突处理策略](#9-gitlab-受保护分支与非保护分支冲突处理策略)
+  - [9.1 受保护分支（master / main）冲突处理](#91-受保护分支master--main冲突处理)
+  - [9.2 非保护分支（gray / test）冲突处理](#92-非保护分支gray--test冲突处理)
+  - [9.3 核心原则与注意事项](#93-核心原则与注意事项)
 
 ---
 
@@ -59,8 +63,8 @@ git pull origin gray
 git merge feat/xxx --no-ff -m "feat: 合并 xxx 功能到 gray 测试"
 ```
 
-> **说明**：  
-> - `--no-ff` 确保即使可以快进（fast-forward），也生成一个双父提交。  
+> **说明**：
+> - `--no-ff` 确保即使可以快进（fast-forward），也生成一个双父提交。
 > - `-m` 后面的信息可自定义，若不加会弹出编辑器让你编辑。
 
 ### 2.3 如果出现冲突（Automatic merge failed）
@@ -171,4 +175,63 @@ git merge --abort
   git branch -d feat/xxx
   git push origin --delete feat/xxx
   ```
+
+---
+
+## 9. GitLab 受保护分支与非保护分支冲突处理策略
+
+在 GitLab 中，合并请求（MR/PR）出现冲突时，处理方式取决于目标分支是否为受保护分支。核心原则：**受保护分支冲突时，将目标分支合并入源分支解决；非保护分支冲突时，直接在目标分支解决，避免反向合并污染源分支。**
+
+### 9.1 受保护分支（master / main）冲突处理
+
+受保护分支通常禁止直接 push，必须通过 MR 合并。当开发分支 `feature/xxx` 合并到 `master` 或 `main` 出现冲突时，标准做法：
+
+1. 切换到源分支（开发分支）：
+   ```bash
+   git checkout feature/xxx
+   git pull origin feature/xxx
+   ```
+2. 获取目标分支最新代码并合并到当前分支：
+   ```bash
+   git fetch origin
+   git merge origin/master --no-ff -m "chore: 合并 master 解决冲突"
+   # 或 git merge origin/main --no-ff ...
+   ```
+3. 解决冲突：编辑冲突文件，`git add`，`git merge --continue`。
+4. 推送到远程源分支：
+   ```bash
+   git push origin feature/xxx
+   ```
+5. 回到 GitLab MR 页面，冲突消失，可继续合并。
+
+> 说明：将 `master`/`main` 合并入 `feature` 分支，不会污染受保护分支，同时让 MR 变为可合并状态。
+
+### 9.2 非保护分支（gray / test）冲突处理
+
+非保护分支如 `gray`、`test` 通常允许直接 push，也不强制走 MR。当开发分支 `feature/xxx` 需要合并到 `gray` 出现冲突时：
+
+- **推荐做法**：直接切换到目标分支（如 `gray`），拉取最新，然后合并开发分支并在目标分支解决冲突。
+  ```bash
+  git checkout gray
+  git pull origin gray
+  git merge feature/xxx --no-ff -m "feat: 合并 xxx 到 gray"
+  # 解决冲突
+  git add .
+  git merge --continue
+  git push origin gray
+  ```
+- **不要反向操作**：不要把 `gray` 或 `test` 合并回 `feature/xxx`。因为 `gray`/`test` 可能包含其他未上线的测试代码或临时提交，反向合并会把这些内容带入开发分支，污染开发分支，导致后续合并到 `master` 时引入不该上线的代码。
+
+### 9.3 核心原则与注意事项
+
+| 场景 | 目标分支 | 冲突解决方向 | 原因 |
+|---|---|---|---|
+| 开发分支 → 受保护分支 | `master` / `main` | 将目标分支合并入源分支（`master` → `feature`） | 受保护分支不能直接改，通过 MR 合并；避免污染受保护分支 |
+| 开发分支 → 非保护分支 | `gray` / `test` | 直接在目标分支解决（`gray` 合并 `feature`） | 非保护分支可直接 push；避免反向合并污染开发分支 |
+| 反向合并 | 任何情况 | 禁止将 `gray`/`test` 合并回 `feature` | 会引入测试环境代码，污染开发分支 |
+
+- 无论使用命令行还是 PhpStorm、VS Code 等 IDE，合并逻辑一致。
+- 解决冲突后，务必本地验证代码可运行，再 push。
+- 受保护分支的 MR 冲突解决后，MR 会自动更新。
+
 ---
