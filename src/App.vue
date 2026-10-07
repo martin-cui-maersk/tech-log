@@ -58,7 +58,7 @@
     <div class="layout" :class="{ 'is-collapsed': !sidebarOpen || !showSidebar }">
       <aside v-if="showSidebar" id="app-sidebar" class="sidebar">
         <div class="sidebar-inner">
-          <div class="sidebar-group">
+          <div class="sidebar-group" style="display: none">
             <div class="sidebar-group-title">首页</div>
             <!-- exact：否则 "/" 是任何路径的前缀，"前言"会在所有文档页一直高亮 -->
             <router-link to="/" class="sidebar-link" exact>前言</router-link>

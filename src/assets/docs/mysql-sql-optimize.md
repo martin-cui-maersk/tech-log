@@ -6,6 +6,7 @@ order: 3
 slug: mysql-sql-optimize
 description: 定位慢 SQL、读懂 EXPLAIN、索引设计与查询改写、深分页和写入优化的实战清单
 ---
+
 # MySQL SQL 优化实战指南
 
 > **适用场景**：接口变慢、慢查询日志出现新 SQL、上线前做 SQL 评审。

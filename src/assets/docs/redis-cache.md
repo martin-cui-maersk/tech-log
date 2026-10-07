@@ -2,7 +2,7 @@
 title: Redis 缓存实战：一致性、三大缓存问题与调优
 navTitle: Redis 缓存实战
 category: Redis
-order: 9
+order: 3
 description: 数据结构选型、Cache Aside 一致性、穿透/击穿/雪崩、大 key 热 key、过期淘汰、分布式锁与排查命令
 ---
 # Redis 缓存实战：一致性、三大缓存问题与调优
