@@ -1,8 +1,9 @@
 /**
  * 文档全文检索（纯前端，零依赖）
  *
- * 索引来自 src/utils/docRegistry 自动扫描出来的文档内容，构建时就已经打进
- * app.js，所以搜索不需要后端、不需要额外请求，离线也能用。
+ * 索引来自 src/utils/docRegistry 自动扫描出来的文档。正文是按需加载的，
+ * 所以索引也是**按需构建**：第一次搜索（或页面空闲时的预取）会把
+ * docs-body chunk 拉下来，切小节建一次索引，之后缓存复用。
  *
  * 做法：
  *   1. 每篇文档用 markdown-it 渲染一遍，按 h1~h4 切成「小节」
@@ -10,14 +11,10 @@
  *   3. 查询词按空格拆成多个词，要求全部命中（AND），按权重打分排序：
  *      文档标题 > 小节标题 > 正文，正文里出现次数越多、位置越靠前分越高
  *   4. 返回带高亮片段的 segments（不返回 HTML，避免 XSS）
- *
- * 索引是懒加载的：第一次搜索时才构建，之后缓存。
  */
-import MarkdownIt from 'markdown-it'
-import { docs } from './docRegistry'
+import { loadAllDocs } from './docRegistry'
+import { loadMarkdownIt } from './markdown'
 import { headingId } from './anchor'
-
-const md = new MarkdownIt({ html: true, linkify: true, typographer: true })
 
 const SNIPPET_LENGTH = 120
 const SNIPPET_BEFORE = 36
@@ -63,10 +60,10 @@ function makeItem (doc, heading, anchor, text) {
   }
 }
 
-function buildIndex () {
+function buildIndex (loaded, md) {
   const items = []
-  docs.forEach(doc => {
-    const html = md.render(doc.content)
+  loaded.forEach(({ meta, content }) => {
+    const html = md.render(content)
     const headingRe = /<h([1-4])[^>]*>([\s\S]*?)<\/h\1>/g
     const marks = []
     let match
@@ -76,32 +73,53 @@ function buildIndex () {
     }
 
     if (!marks.length) {
-      items.push(makeItem(doc, '', '', normalize(stripTags(html))))
+      items.push(makeItem(meta, '', '', normalize(stripTags(html))))
       return
     }
 
     // 第一个标题之前的内容（大多数文档没有）
     const intro = normalize(stripTags(html.slice(0, marks[0].start)))
     if (intro) {
-      items.push(makeItem(doc, '', '', intro))
+      items.push(makeItem(meta, '', '', intro))
     }
 
     marks.forEach((mark, index) => {
       const end = index + 1 < marks.length ? marks[index + 1].start : html.length
       const body = normalize(stripTags(html.slice(mark.end, end)))
-      items.push(makeItem(doc, mark.heading, headingId(mark.heading), body))
+      items.push(makeItem(meta, mark.heading, headingId(mark.heading), body))
     })
   })
   return items
 }
 
 let cachedIndex = null
+let building = null
 
-function getIndex () {
-  if (!cachedIndex) {
-    cachedIndex = buildIndex()
+export function isIndexReady () {
+  return cachedIndex !== null
+}
+
+/**
+ * 确保索引可用（首次会加载 docs-body chunk 并建索引），返回 Promise
+ * 多次调用会复用同一次加载
+ */
+export function ensureIndex () {
+  if (cachedIndex) {
+    return Promise.resolve(cachedIndex)
   }
-  return cachedIndex
+  if (!building) {
+    building = Promise.all([loadAllDocs(), loadMarkdownIt()])
+      .then(results => {
+        cachedIndex = buildIndex(results[0], results[1])
+        building = null
+        return cachedIndex
+      })
+      .catch(err => {
+        building = null
+        throw err
+      })
+  }
+  return building
 }
 
 // 把文本切成 [{ text, hit }]，命中的词由组件渲染成 <mark>
@@ -164,12 +182,13 @@ function buildSnippet (text, terms, position) {
 export function search (query, limit) {
   const max = limit || 20
   const terms = normalize(query).toLowerCase().split(' ').filter(Boolean)
-  if (!terms.length) {
+  // 索引还没准备好（正文 chunk 正在加载）时先返回空，组件会提示"正在准备索引"
+  if (!terms.length || !cachedIndex) {
     return []
   }
 
   const results = []
-  getIndex().forEach(item => {
+  cachedIndex.forEach(item => {
     let score = 0
     let bodyPosition = -1
     let matchedAll = true
@@ -217,5 +236,5 @@ export function search (query, limit) {
 
 // 供调试/统计用
 export function indexSize () {
-  return getIndex().length
+  return cachedIndex ? cachedIndex.length : 0
 }

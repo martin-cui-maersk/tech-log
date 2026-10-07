@@ -22,6 +22,13 @@
           <router-link to="/" class="nav-title">技术随笔</router-link>
         </div>
         <div class="nav-actions">
+          <router-link to="/" class="nav-home" exact title="返回首页">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M3.5 10.5 L12 3.5 L20.5 10.5" />
+              <path d="M5.5 9.5 V20 H18.5 V9.5" />
+            </svg>
+            <span class="nav-home-text">首页</span>
+          </router-link>
           <DocSearch />
           <button
             type="button"
@@ -400,6 +407,42 @@ body {
   align-items: center;
   gap: 8px;
   flex: none;
+}
+
+/* 导航栏上的"首页"按钮 */
+.nav-home {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 34px;
+  padding: 0 11px;
+  flex: none;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--content-text);
+  text-decoration: none;
+  background-color: transparent;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-sm);
+  transition: color 0.2s, background-color 0.2s, border-color 0.2s, box-shadow 0.2s;
+}
+
+.nav-home:hover {
+  color: var(--link-color);
+  background-color: var(--hover-bg);
+  border-color: var(--theme-color);
+}
+
+.nav-home.router-link-active {
+  color: var(--link-color);
+  border-color: var(--theme-color);
+  background-color: var(--theme-color-softer);
+}
+
+.nav-home:focus-visible {
+  outline: 2px solid var(--theme-color);
+  outline-offset: 2px;
 }
 
 /* 主题切换按钮 */
@@ -802,6 +845,15 @@ body {
 
   .edit-on-github {
     padding: 6px 9px;
+  }
+
+  /* 首页按钮同样只留图标 */
+  .nav-home-text {
+    display: none;
+  }
+
+  .nav-home {
+    padding: 0 9px;
   }
 }
 </style>

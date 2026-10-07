@@ -28,7 +28,8 @@
         aria-label="搜索文档内容"
         autocomplete="off"
         spellcheck="false"
-        @focus="open = true"
+        @focus="open = true; warmIndex()"
+        @mouseenter="warmIndex"
         @keydown.esc.prevent="closeAndBlur"
         @keydown.down.prevent="move(1)"
         @keydown.up.prevent="move(-1)"
@@ -45,7 +46,8 @@
     </div>
 
     <div v-if="open && query" class="search-panel">
-      <p v-if="!results.length" class="search-empty">
+      <p v-if="indexLoading" class="search-empty">正在准备搜索索引…</p>
+      <p v-else-if="!results.length" class="search-empty">
         没有找到「{{ query }}」相关的内容
       </p>
       <ul v-else class="search-list">
@@ -76,7 +78,7 @@
 </template>
 
 <script>
-import { search } from '@/utils/docSearch'
+import { search, ensureIndex, isIndexReady } from '@/utils/docSearch'
 
 export default {
   name: 'DocSearch',
@@ -86,13 +88,13 @@ export default {
       open: false,
       expanded: false,
       isNarrow: false,
-      activeIndex: 0
+      activeIndex: 0,
+      // 搜索结果（正文 chunk 加载完、索引建好后才有）
+      results: [],
+      indexLoading: false
     }
   },
   computed: {
-    results () {
-      return search(this.query, 12)
-    },
     // 桌面端一直显示搜索框；窄屏先显示一个图标，点开再展开
     showField () {
       return this.expanded || !this.isNarrow
@@ -102,6 +104,7 @@ export default {
     query () {
       this.activeIndex = 0
       this.open = Boolean(this.query)
+      this.runSearch()
     }
   },
   mounted () {
@@ -116,6 +119,45 @@ export default {
     window.removeEventListener('resize', this.updateNarrow, { passive: true })
   },
   methods: {
+    // 用户对搜索表现出兴趣（hover / 聚焦 / 快捷键）时，提前把正文 chunk 拉下来建索引。
+    // 不做"空闲时预取"：没人搜索的访客不该多下 200 多 KB。
+    warmIndex () {
+      if (isIndexReady()) {
+        return
+      }
+      ensureIndex().then(() => {
+        if (this.query) {
+          this.runSearch()
+        }
+      }).catch(() => {})
+    },
+    runSearch () {
+      const query = this.query
+      if (!query) {
+        this.results = []
+        this.indexLoading = false
+        return
+      }
+      if (isIndexReady()) {
+        this.results = search(query, 12)
+        this.indexLoading = false
+        return
+      }
+      // 索引还在加载：提示一下，加载完再出结果
+      this.results = []
+      this.indexLoading = true
+      ensureIndex()
+        .then(() => {
+          if (this.query !== query) {
+            return
+          }
+          this.results = search(query, 12)
+          this.indexLoading = false
+        })
+        .catch(() => {
+          this.indexLoading = false
+        })
+    },
     updateNarrow () {
       this.isNarrow = window.innerWidth <= 720
     },
@@ -177,6 +219,7 @@ export default {
       if (isSlash || isCommandK) {
         event.preventDefault()
         this.expandSearch()
+        this.warmIndex()
       }
     }
   }

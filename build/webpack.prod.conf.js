@@ -27,7 +27,7 @@ const webpackConfig = merge(baseWebpackConfig, {
   output: {
     path: config.build.assetsRoot,
     filename: utils.assetsPath('js/[name].[chunkhash].js'),
-    chunkFilename: utils.assetsPath('js/[id].[chunkhash].js')
+    chunkFilename: utils.assetsPath('js/[name].[chunkhash].js')
   },
   plugins: [
     // http://vuejs.github.io/vue-loader/en/workflow/production.html
@@ -87,13 +87,27 @@ const webpackConfig = merge(baseWebpackConfig, {
       name: 'vendor',
       minChunks (module) {
         // any required modules inside node_modules are extracted to vendor
-        return (
-          module.resource &&
-          /\.js$/.test(module.resource) &&
-          module.resource.indexOf(
-            path.join(__dirname, '../node_modules')
-          ) === 0
+        if (
+          !module.resource ||
+          !/\.js$/.test(module.resource) ||
+          module.resource.indexOf(path.join(__dirname, '../node_modules')) !== 0
+        ) {
+          return false
+        }
+        // markdown-it 只在按需加载的路径里用（渲染文档正文 / 构建搜索索引），
+        // 它和它的依赖不进首屏 vendor，留给异步 chunk；首页不需要它
+        const deferred = [
+          'markdown-it',
+          'entities',
+          'linkify-it',
+          'mdurl',
+          'uc.micro'
+        ]
+        const inNodeModules = path.join(__dirname, '../node_modules')
+        const isDeferred = deferred.some(lib =>
+          module.resource.indexOf(path.join(inNodeModules, lib) + path.sep) === 0
         )
+        return !isDeferred
       }
     }),
     // extract webpack runtime and module manifest to its own file in order to

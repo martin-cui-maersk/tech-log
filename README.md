@@ -87,8 +87,32 @@ slug: git-merge            # 自定义访问地址（默认用文件名）
 - 快捷键：`/` 或 `Ctrl/Cmd + K` 聚焦搜索框，`↑` `↓` 选择结果，`Enter` 打开，`Esc` 关闭。
 - 结果是**按小节**给的，点进去会直接滚到对应小节（自动留出固定导航栏的高度），命中的关键词会高亮。
 - 多个关键词用空格分隔，是「全部命中」的关系，例如 `索引 区分度`；排序权重：文档标题 > 小节标题 > 正文（出现次数多、位置靠前的更优先）。
-- 实现都在 [src/utils/docSearch.js](src/utils/docSearch.js)：懒加载构建一次索引（按 h1~h4 切小节），之后缓存；标题锚点用 [src/utils/anchor.js](src/utils/anchor.js) 的规则，和 MarkdownViewer 生成标题 id 的逻辑共用，保证搜索结果能精确跳转。
+- 实现都在 [src/utils/docSearch.js](src/utils/docSearch.js)：**正文 chunk 加载后**构建一次索引（按 h1~h4 切小节）并缓存；标题锚点用 [src/utils/anchor.js](src/utils/anchor.js) 的规则，和 MarkdownViewer 生成标题 id 的逻辑共用，保证搜索结果能精确跳转。
+- 索引不在首屏加载：鼠标移到搜索框、点进输入框、按 `/` 或 `Ctrl/Cmd + K` 时才开始加载（见下面的「按需加载」）。没准备好的那一瞬间会显示「正在准备搜索索引…」。
 - 文档内容变了（新增 / 修改 md）需要重新构建才能被搜到，这和自动扫描是同一套逻辑。
+
+## 按需加载
+
+首屏只需要"外壳 + 文档元信息"，正文和 markdown-it 都放在异步 chunk 里，用户真正要看文档或搜索时才下载。
+
+| 产物 | 大小 | 何时加载 |
+| --- | --- | --- |
+| `vendor.js`（vue / vue-router） | ~147 KB | 首屏 |
+| `app.js`（页面、组件、文档**元信息**、搜索逻辑） | ~31 KB | 首屏 |
+| `docs-body.js`（全部文档正文） | ~164 KB | 打开任意文档，或首次搜索时 |
+| `markdown.js`（markdown-it 及其依赖） | ~95 KB | 同上 |
+
+机制：
+
+- [build/loaders/doc-body-loader.js](build/loaders/doc-body-loader.js) 把每个 `.md` 编译成 `{ meta, load() }`：`meta`（标题/分类/排序/简介）进主包，`load()` 通过 `require.ensure` 从 `docs-body` chunk 按需取正文；元信息解析规则放在 [src/utils/docMeta.js](src/utils/docMeta.js)，构建（loader）和运行（浏览器）共用一份。
+- markdown-it 只在「渲染正文」和「建搜索索引」时用到，所以改成 [src/utils/markdown.js](src/utils/markdown.js) 里的 `loadMarkdownIt()` 动态 import；同时 `build/webpack.prod.conf.js` 的 `CommonsChunkPlugin` 把它和它的依赖排除出首屏 vendor。
+- 深链接带 `#锚点` 时，路由的 `scrollBehavior` 执行时元素还没渲染，所以 [src/components/DocsView.vue](src/components/DocsView.vue) 在正文渲染完成后（MarkdownViewer 的 `rendered` 事件）再定位一次。
+
+## 首页
+
+- 首页结构参考 VitePress：**Hero**（大标题 + 一句话 + 「N 篇文档 · M 个分类」+ 「开始阅读」「按分类浏览」两个按钮）+ **分类卡片网格**（图标 / 分类名 / 文档数 / 该分类下的文档列表 / 「开始阅读 →」）。
+- 卡片、统计数字、按钮指到的文档**全部由文档扫描结果生成**，新增分类或文档后无需改代码；图标在 `src/components/Home.vue` 的 `CATEGORY_ICONS` 里配置，没配置的分类用默认图标。
+- 导航栏左侧有常驻的「**首页**」按钮（窄屏只留图标），当前在首页时会高亮。
 
 ## 构建
 
@@ -111,8 +135,7 @@ npm run build
 
 ## 说明
 
-- 所有 markdown 内容都会打进 `app.js`，所以**新增文件后必须重新构建**才能在页面上看到；`npm run dev` 挂着时 webpack 会自动重建。
-- 文档多了以后 `app.js` 会变大，如果明显影响首屏加载，可以把文档改成按需加载（`import()` 分包）。
+- markdown 内容按需加载（见上面的「按需加载」），但**新增文件后仍然必须重新构建**才能在页面上看到；`npm run dev` 挂着时 webpack 会自动重建。
 - markdown 里引用图片时建议用绝对路径 `/tech-log/static/img/xxx.png`，图片放在 `static/` 目录下。
 - 右下角有「回到顶部」按钮：往下滚超过 300px 才出现，点击平滑滚回顶部；点侧边栏切换文档会自动回到页面顶部（浏览器前进/后退时恢复原来位置）。阈值在 `src/App.vue` 的 `BACK_TO_TOP_OFFSET`。
 

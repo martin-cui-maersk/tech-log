@@ -3,7 +3,7 @@
 </template>
 
 <script>
-import MarkdownIt from 'markdown-it'
+import { loadMarkdownIt } from '@/utils/markdown'
 import { headingId } from '@/utils/anchor'
 
 function addAnchorIds (html) {
@@ -22,17 +22,33 @@ export default {
   },
   data () {
     return {
-      md: new MarkdownIt({
-        html: true,
-        linkify: true,
-        typographer: true
-      })
+      // markdown-it 是按需加载的，渲染结果放在这里（不阻塞组件挂载）
+      renderedContent: ''
     }
   },
-  computed: {
-    renderedContent () {
-      const raw = this.md.render(this.content)
-      return addAnchorIds(raw)
+  watch: {
+    content: {
+      immediate: true,
+      handler: 'render'
+    }
+  },
+  methods: {
+    render () {
+      const content = this.content
+      if (!content) {
+        this.renderedContent = ''
+        return
+      }
+      loadMarkdownIt().then(md => {
+        // 渲染期间内容可能已经切换成别的文档
+        if (this.content === content) {
+          this.renderedContent = addAnchorIds(md.render(content))
+          // 通知父组件"内容真的进 DOM 了"，便于深链接的 #锚点定位
+          this.$nextTick(() => this.$emit('rendered'))
+        }
+      }).catch(() => {
+        this.renderedContent = ''
+      })
     }
   }
 }

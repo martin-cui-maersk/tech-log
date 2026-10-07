@@ -76,8 +76,10 @@ module.exports = {
         }
       },
       {
+        // 文档只把元信息打进主包，正文由 loader 生成的 load() 走异步 chunk
+        // （见 build/loaders/doc-body-loader.js）
         test: /\.md$/,
-        loader: 'raw-loader'
+        loader: path.resolve(__dirname, 'loaders/doc-body-loader.js')
       }
     ]
   },

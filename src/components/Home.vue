@@ -1,9 +1,33 @@
 <template>
   <div class="home">
-    <div class="hero">
-      <h1 class="hero-title">Tech Log</h1>
+    <!-- Hero：标题 + 一句话 + 统计 + 两个入口按钮 -->
+    <section class="hero">
+      <h1 class="hero-title">技术随笔</h1>
       <p class="hero-subtitle">个人技术学习笔记与文档</p>
-    </div>
+      <p class="hero-tagline">{{ docs.length }} 篇实战文档 · {{ categories.length }} 个分类 · 支持全文搜索</p>
+      <div class="hero-actions">
+        <router-link class="hero-button hero-button-primary" :to="firstDocLink">开始阅读 →</router-link>
+        <a class="hero-button" href="#分类">按分类浏览</a>
+      </div>
+    </section>
+
+    <!-- 分类卡片：和参考站一样的网格布局，全部由文档扫描结果生成 -->
+    <section id="分类" class="feature-section">
+      <div class="feature-grid">
+        <router-link
+          v-for="card in cards"
+          :key="card.name"
+          class="feature-card"
+          :to="card.link"
+        >
+          <span class="feature-icon" aria-hidden="true">{{ card.icon }}</span>
+          <span class="feature-title">{{ card.name }}</span>
+          <span class="feature-meta">{{ card.count }} 篇文档</span>
+          <span class="feature-details">{{ card.details }}</span>
+          <span class="feature-action">开始阅读 →</span>
+        </router-link>
+      </div>
+    </section>
 
     <div class="info-section">
       <h2>前言</h2>
@@ -40,28 +64,32 @@
         </tbody>
       </table>
     </div>
-
-    <div class="info-section">
-      <h2>文档导航</h2>
-      <!-- 这里的内容来自 src/assets/docs 自动扫描，新增 markdown 文件后无需改动 -->
-      <p v-if="!docs.length" class="empty-tip">还没有文档，把 .md 文件放进 src/assets/docs 就可以了。</p>
-      <div v-for="group in categories" :key="group.name" class="doc-group">
-        <h3>{{ group.name }}</h3>
-        <ul class="doc-list">
-          <li v-for="doc in group.docs" :key="doc.slug">
-            <router-link :to="'/docs/' + doc.slug" class="doc-card">
-              <span class="doc-title">{{ doc.title }}</span>
-              <span v-if="doc.description" class="doc-desc">{{ doc.description }}</span>
-            </router-link>
-          </li>
-        </ul>
-      </div>
-    </div>
   </div>
 </template>
 
 <script>
 import { docs, categories } from '@/utils/docRegistry'
+
+// 分类图标（拿不到就显示默认图标，新增分类不用改代码）
+const CATEGORY_ICONS = {
+  Git: '🌿',
+  MySQL: '🗄️',
+  PHP: '🐘',
+  Hyperf: '⚡',
+  网络: '📡',
+  设计模式: '🏛️',
+  算法: '📊',
+  Redis: '🚀',
+  Docker: '🐳',
+  Linux: '🖥️'
+}
+const DEFAULT_ICON = '📄'
+const DETAILS_MAX = 56
+
+function docDetails (group) {
+  const names = group.docs.map(doc => doc.navTitle).join(' · ')
+  return names.length > DETAILS_MAX ? names.slice(0, DETAILS_MAX).trim() + '…' : names
+}
 
 export default {
   name: 'Home',
@@ -70,22 +98,35 @@ export default {
       docs: docs,
       categories: categories
     }
+  },
+  computed: {
+    firstDocLink () {
+      return this.docs.length ? '/docs/' + this.docs[0].slug : '/'
+    },
+    cards () {
+      return this.categories.map(group => ({
+        name: group.name,
+        icon: CATEGORY_ICONS[group.name] || DEFAULT_ICON,
+        count: group.docs.length,
+        details: docDetails(group),
+        link: '/docs/' + group.docs[0].slug
+      }))
+    }
   }
 }
 </script>
 
 <style scoped>
 .home {
-  max-width: 860px;
+  max-width: 1040px;
   margin: 0 auto;
 }
 
+/* ---------- Hero ---------- */
 .hero {
   position: relative;
   text-align: center;
-  padding: 62px 0 44px;
-  border-bottom: 1px solid var(--border-color);
-  margin-bottom: 40px;
+  padding: 58px 0 40px;
 }
 
 /* 标题后面一层很淡的绿色光晕 */
@@ -94,8 +135,8 @@ export default {
   position: absolute;
   top: -30px;
   left: 50%;
-  width: 460px;
-  height: 220px;
+  width: 520px;
+  height: 240px;
   transform: translateX(-50%);
   background: radial-gradient(closest-side, var(--theme-color-soft), transparent 75%);
   pointer-events: none;
@@ -106,7 +147,7 @@ export default {
   font-size: 42px;
   font-weight: 700;
   color: var(--heading-text);
-  margin-bottom: 12px;
+  margin-bottom: 10px;
   letter-spacing: -1px;
 }
 
@@ -116,6 +157,127 @@ export default {
   color: var(--content-text-light);
 }
 
+.hero-tagline {
+  position: relative;
+  margin-top: 14px;
+  font-size: 14px;
+  color: var(--content-text-light);
+}
+
+.hero-actions {
+  position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 26px;
+}
+
+.hero-button {
+  display: inline-flex;
+  align-items: center;
+  padding: 10px 22px;
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--content-text);
+  background-color: var(--content-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 999px;
+  text-decoration: none;
+  box-shadow: var(--shadow-sm);
+  transition: color 0.2s, background-color 0.2s, border-color 0.2s, box-shadow 0.2s, transform 0.2s;
+}
+
+.hero-button:hover {
+  color: var(--link-color);
+  border-color: var(--theme-color);
+  box-shadow: var(--shadow-md);
+  transform: translateY(-1px);
+}
+
+.hero-button-primary {
+  color: #fff;
+  background-color: var(--theme-color);
+  border-color: var(--theme-color);
+}
+
+.hero-button-primary:hover {
+  color: #fff;
+  background-color: var(--theme-color-light);
+  border-color: var(--theme-color-light);
+}
+
+/* ---------- 分类卡片 ---------- */
+.feature-section {
+  scroll-margin-top: 84px;
+  margin-bottom: 44px;
+}
+
+.feature-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(290px, 1fr));
+  gap: 16px;
+}
+
+.feature-card {
+  display: flex;
+  flex-direction: column;
+  padding: 20px 22px 18px;
+  background-color: var(--content-bg);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  text-decoration: none;
+  transition: border-color 0.2s, box-shadow 0.2s, transform 0.2s, background-color 0.2s;
+}
+
+.feature-card:hover {
+  border-color: var(--theme-color);
+  box-shadow: var(--shadow-md);
+  transform: translateY(-2px);
+}
+
+.feature-icon {
+  font-size: 26px;
+  line-height: 1.2;
+}
+
+.feature-title {
+  margin-top: 10px;
+  font-size: 16.5px;
+  font-weight: 650;
+  color: var(--heading-text);
+  transition: color 0.2s;
+}
+
+.feature-card:hover .feature-title {
+  color: var(--link-color);
+}
+
+.feature-meta {
+  margin-top: 3px;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--link-color);
+}
+
+.feature-details {
+  flex: 1;
+  margin-top: 8px;
+  font-size: 13px;
+  line-height: 1.65;
+  color: var(--content-text-light);
+}
+
+.feature-action {
+  margin-top: 14px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--link-color);
+}
+
+/* ---------- 前言 / 版本记录 ---------- */
 .info-section {
   margin-bottom: 40px;
 }
@@ -163,65 +325,23 @@ export default {
   border-bottom: none;
 }
 
-.doc-group {
-  margin-bottom: 26px;
-}
+/* 窄屏：Hero 收一点，卡片单列 */
+@media (max-width: 720px) {
+  .hero {
+    padding: 40px 0 30px;
+  }
 
-.doc-group h3 {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--content-text-light);
-  text-transform: uppercase;
-  letter-spacing: 0.6px;
-  margin-bottom: 10px;
-}
+  .hero-title {
+    font-size: 32px;
+  }
 
-.doc-list {
-  list-style: none;
-  padding: 0;
-  display: grid;
-  gap: 10px;
-}
+  .hero-button {
+    padding: 9px 18px;
+    font-size: 14px;
+  }
 
-/* 每篇文档一张可点的小卡片 */
-.doc-card {
-  display: block;
-  padding: 12px 16px;
-  background-color: var(--content-bg);
-  border: 1px solid var(--border-color);
-  border-radius: var(--radius-md);
-  box-shadow: var(--shadow-sm);
-  text-decoration: none;
-  transition: border-color 0.2s, box-shadow 0.2s, transform 0.2s, background-color 0.2s;
-}
-
-.doc-card:hover {
-  border-color: var(--theme-color);
-  box-shadow: var(--shadow-md);
-  transform: translateY(-2px);
-}
-
-.doc-title {
-  display: block;
-  font-size: 15px;
-  font-weight: 600;
-  color: var(--heading-text);
-  transition: color 0.2s;
-}
-
-.doc-card:hover .doc-title {
-  color: var(--link-color);
-}
-
-.doc-desc {
-  display: block;
-  margin-top: 5px;
-  font-size: 13px;
-  line-height: 1.65;
-  color: var(--content-text-light);
-}
-
-.empty-tip {
-  color: var(--content-text-light);
+  .feature-grid {
+    grid-template-columns: 1fr;
+  }
 }
 </style>
