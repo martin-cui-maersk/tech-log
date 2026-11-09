@@ -171,18 +171,85 @@ final class LatestNoticeRequest implements OsBackendRequestInterface
     public function options(): array  { return []; }
 }
 
-// 统一处理：签名、校验、发 HTTP 全在这一处
+```
+
+**真正被统一的横切逻辑**（`HttpClientInterface`、`OsBackendException` 为项目内已有组件）：
+
+```php
 final class OsBackendClient
 {
+    public function __construct(
+        private readonly HttpClientInterface $http,
+        private readonly string $appId,
+        private readonly string $appSecret,
+    ) {}
+
     public function request(OsBackendRequestInterface $request): array
     {
-        return $this->httpClient->requestJson(
+        // ① 把接口暴露的字段统一组装成 HTTP 选项
+        $options = $request->options();
+        $options['query'] = $request->query();
+        if ($request->method() !== 'GET') {
+            $options['json'] = $request->json();
+        }
+
+        // ② 统一签名：每个 API 都不用自己算
+        $headers = [
+            'X-App-Id'    => $this->appId,
+            'X-Timestamp' => (string) time(),
+            'X-Nonce'     => bin2hex(random_bytes(8)),
+        ];
+        $headers['X-Sign'] = $this->sign($request, $headers);
+        $options['headers'] = array_merge($options['headers'] ?? [], $headers);
+
+        // ③ 发请求 + 统一校验业务码
+        $response = $this->http->requestJson(
             'os_backend',
             $request->method(),
             $request->path(),
-            $this->signedOptions($request),
+            $options,
         );
+
+        if (($response['code'] ?? -1) !== 0) {
+            throw new OsBackendException($response['message'] ?? 'unknown error');
+        }
+
+        return $response['data'] ?? [];
     }
+
+    private function sign(OsBackendRequestInterface $request, array $headers): string
+    {
+        $payload = implode("\n", [
+            $request->method(),
+            $request->path(),
+            $headers['X-Timestamp'],
+            $headers['X-Nonce'],
+            json_encode($request->query(), JSON_UNESCAPED_SLASHES),
+            json_encode($request->json(), JSON_UNESCAPED_SLASHES),
+        ]);
+
+        return hash_hmac('sha256', $payload, $this->appSecret);
+    }
+}
+```
+
+**调用方：只传业务参数，横切逻辑一概不管**
+
+```php
+// 现有 API
+$data   = $client->request(new ValidateTokenRequest($token, 2)); // 2 = Web 端
+$notice = $client->request(new LatestNoticeRequest());
+
+// 新增 API：只加一个 Request 类，Client 零改动
+final class RevokeTokenRequest implements OsBackendRequestInterface
+{
+    public function __construct(private readonly string $token) {}
+
+    public function method(): string  { return 'POST'; }
+    public function path(): string    { return '/openapi/token/revoke'; }
+    public function query(): array    { return []; }
+    public function json(): array     { return ['token' => $this->token]; }
+    public function options(): array  { return ['timeout' => 3]; }
 }
 ```
 
