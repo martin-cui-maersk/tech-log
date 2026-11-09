@@ -44,14 +44,14 @@ git add docs src && git commit -m "add my-note" && git push
 
 ```markdown
 ---
-title: Git 合并流程完整指南（合并到 gray / master）
+title: Git 合并流程完整指南（test → gray → main）
 navTitle: Git 合并指南     # 侧边栏显示的精简标题
 category: Git              # 不写则按子目录名或文件名前缀推导
 order: 1                   # 分类内排序，也决定分类之间的顺序
-description: 功能分支合并到 gray/master 的完整流程
+description: 功能分支经 test、gray 两级验证后合并到 main 的完整流程
 slug: git-merge            # 自定义访问地址（默认用文件名）
 ---
-# Git 合并流程完整指南（合并到 gray / master）
+# Git 合并流程完整指南（test → gray → main）
 
 正文……
 ```

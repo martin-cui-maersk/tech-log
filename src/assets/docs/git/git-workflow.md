@@ -7,6 +7,10 @@ order: 2
 
 本文档记录了从建立功能分支到合并、部署、维护分支的常用 Git 命令流程，供团队统一规范参考。
 
+> **分支链约定**：`feat/xxx → test（测试）→ gray（灰度/预发布）→ main（生产）`，只向前合并，禁止反向。
+> 本文是命令速查，覆盖到「合并到 test」为止；`test → gray → main` 的逐级推进见《Git 合并流程完整指南（test → gray → main）》。
+> `git pull --rebase` 仅用于同步远端主线；功能分支合并按合并指南使用 `--no-ff` 产生合并提交。
+
 ---
 
 ## 📑 目录
@@ -20,11 +24,11 @@ order: 2
 - [7. 分支对比](#7-分支对比-compare-branches)
 - [8. 暂存与恢复改动](#8-暂存与恢复改动-stash)
 - [9. 撤销改动](#9-撤销改动-undo-changes)
-- [10. 修改最近提交](#10-修改最近提交-commit--amend)
+- [10. 修改最近提交](#10-修改最近提交-commit---amend)
 - [11. 交互式变基整理提交](#11-交互式变基整理提交-rebase--i)
 - [12. 打标签与发布版本](#12-打标签与发布版本-tag)
 - [13. 挑选提交](#13-挑选提交-cherry-pick)
-- [14. 查看状态与历史](#14-查看状态与历史-status--log)
+- [14. 查看状态与历史](#14-查看状态与历史-status-log)
 - [15. 清理未跟踪文件](#15-清理未跟踪文件-clean)
 - [16. 安全回滚已推送提交](#16-安全回滚已推送提交-revert)
 - [17. 误操作恢复 (Reflog)](#17-误操作恢复-reflog)
@@ -38,17 +42,17 @@ order: 2
 
 ## 📅 1. 创建全新功能分支 (Create New Branch)
 
-开始开发新功能前，务必基于最新的 `master` 分支建立独立的 feature 分支。
+开始开发新功能前，务必基于最新的 `main` 分支建立独立的 feature 分支。
 
 ```bash
 # 1. 切换到主分支
-git checkout master
+git checkout main
 
 # 2. 拉取远端最新代码
 # git pull
 # 改用如下方法，历史线：干净的一条直线。所有当前分支的提交，都会被重新“复制并粘贴”到 main 的最新提交之后。
 git fetch origin
-git rebase origin/master
+git rebase origin/main
 # 如果你既想用 git pull 同步远程代码，又不想看到密密麻麻的合并提交，可以使用快捷方式 git pull --rebase
 
 # 3. 创建并直接切换到新功能分支
@@ -71,8 +75,8 @@ git checkout test
 # 2. 拉取远端 test 的最新代码（避免覆盖他人代码）
 git pull origin test
 
-# 3. 将开发分支合并进 test
-git merge feat/pod-supports-type-B-stores
+# 3. 将开发分支合并进 test（--no-ff 强制产生合并提交）
+git merge feat/pod-supports-type-B-stores --no-ff -m "feat: 合并 pod-supports-type-B-stores 到 test"
 ```
 
 ---
@@ -120,7 +124,7 @@ git push origin test
 
 ```bash
 # 删除已合并/不再需要的本地分支（需先切到其他分支）
-git checkout master
+git checkout main
 git branch -d feat/pod-supports-type-B-stores
 
 # 强制删除未合并的分支（会丢失该分支上的提交，慎用）
@@ -198,16 +202,16 @@ git checkout hotfix/product-form-body-validation -- modules/product/forms/
 
 ```bash
 # 查看两个分支的文件差异列表（哪些文件被修改）
-git diff --name-only master..feat/pod-supports-type-B-stores
+git diff --name-only main..feat/pod-supports-type-B-stores
 
 # 查看具体代码差异（逐行对比）
-git diff master..feat/pod-supports-type-B-stores
+git diff main..feat/pod-supports-type-B-stores
 
-# 仅查看当前分支相对 master 落后的/领先的提交
-git log --oneline master..feat/pod-supports-type-B-stores
+# 仅查看当前分支相对 main 落后的/领先的提交
+git log --oneline main..feat/pod-supports-type-B-stores
 
 # 对比某文件在两个分支上的差异
-git diff master feat/pod-supports-type-B-stores -- modules/product/forms/published/UpdateProductForm.php
+git diff main feat/pod-supports-type-B-stores -- modules/product/forms/published/UpdateProductForm.php
 
 # 图形化查看分支分叉情况
 git log --graph --oneline --all
@@ -440,7 +444,7 @@ git revert <oldest-hash>..<newest-hash>
 git revert --no-commit <commit-hash>
 ```
 
-> 💡 **提示**：与 `git reset --hard` 不同，`revert` 适合公开分支（如 master/test），不会破坏协作者的历史。
+> 💡 **提示**：与 `git reset --hard` 不同，`revert` 适合公开分支（如 main/test），不会破坏协作者的历史。
 
 ---
 
@@ -453,7 +457,7 @@ Git 记录了本地仓库的所有操作（commit、reset、checkout、rebase �
 git reflog
 
 # 按分支查看
-git reflog show master
+git reflog show main
 
 # 恢复误删的 commit（找到目标操作的 commit hash，然后 reset 回去）
 git reflog                       # 找到误操作前的 commit hash
@@ -472,8 +476,8 @@ git reset --hard <target-hash>   # 恢复到误操作前的状态
 # 在指定目录检出另一个工作目录（自动切换分支）
 git worktree add ../hotfix-branch hotfix/product-form-body-validation
 
-# 创建新的工作目录并新建分支（基于 master）
-git worktree add -b feat/new-feature ../feature-branch master
+# 创建新的工作目录并新建分支（基于 main）
+git worktree add -b feat/new-feature ../feature-branch main
 
 # 查看所有工作目录
 git worktree list
@@ -555,7 +559,7 @@ git archive v1.2.0 --prefix=v1.2.0/ -o ../project-v1.2.0.tar.gz
 git shortlog -sn
 
 # 统计某分支的提交者贡献
-git shortlog -sn master
+git shortlog -sn main
 
 # 某作者的提交统计
 git shortlog -sn --author="张三"

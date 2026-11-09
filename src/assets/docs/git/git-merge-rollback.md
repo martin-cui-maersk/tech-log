@@ -7,7 +7,8 @@ description: 误把 gray 合并进 feat/xxx 后，按"是否已推送""有没有
 ---
 # Git 合并方向搞错（gray 合进 feat/xxx）如何回滚
 
-> **场景**：在 `feat/xxx` 上误执行了 `git merge gray`（或 `git pull origin gray`），把测试分支的代码合进了自己的开发分支，方向反了。
+> **场景**：在 `feat/xxx` 上误执行了 `git merge gray`（或 `git pull origin gray`），把灰度分支的代码合进了自己的开发分支，方向反了；误把 `test` 合进 `feat/xxx` 同理，把命令里的 `gray` 换成 `test` 即可。
+> **分支链**：`feat/xxx → test → gray → main`，本文处理的是把下游 `gray` 反向合进功能分支后的回滚。
 > **原则**：先判断「这次合并推送出去了没有」「合并之后有没有继续提交」，再决定用 `reset` 还是 `revert`。**动历史之前先备份分支**。
 >
 > 下面每条命令的结论都在 git 2.39 上的临时仓库里实测过，包括容易踩的快进合并和 revert merge 两个坑。
@@ -185,10 +186,10 @@ git branch --show-current                 # 操作前先确认自己在哪个分
 
 习惯上加几条：
 
-- 在 `feat/xxx` 上同步测试分支，用 `git rebase gray`，不要 `git merge gray`；
+- 同步自己的远端分支只用 `git pull --rebase`（目标是 `origin/feat/xxx`），不要把 `test` / `gray` / `main` 反向拉进 `feat/xxx`；
 - `git pull` 之前先 `git status` + `git branch --show-current`，看清分支再拉；
-- 合并方向交给 MR / PR 去做，服务端把 `gray`、`master` 设成保护分支，禁止直接 push；
-- 记住合并永远是**单向**的：`feat/xxx → gray → master`，反方向只会给自己添麻烦。
+- 合并方向交给 MR / PR 去做，服务端把 `gray`、`main` 设成保护分支，禁止直接 push；
+- 记住合并永远是**单向**的：`feat/xxx → test → gray → main`，反方向只会给自己添麻烦。
 
 ## 9. 速查表
 
