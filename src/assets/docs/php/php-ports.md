@@ -1,4 +1,4 @@
-  ---
+---
 title: PHP 常用端口完整指南
 navTitle: PHP 常用端口
 category: PHP
@@ -8,7 +8,7 @@ description: PHP 开发与部署中涉及的常用端口、配置方法及冲突
 # PHP 常用端口完整指南
 
 > **适用场景**：PHP 开发、部署、运维过程中，需要了解各服务默认端口、修改端口配置或排查端口冲突。
-> **核心说明**：PHP 本身是一种服务器端脚本语言，不直接监听任何端口[reference:0]。PHP 通过 Web 服务器（Nginx / Apache）接收请求，并通过 PHP-FPM 与 Web 服务器通信，再连接数据库、缓存等服务。本文列出 PHP 生态中常见的端口及其用途。
+> **核心说明**：PHP 本身是一种服务器端脚本语言，不直接监听任何端口。PHP 通过 Web 服务器（Nginx / Apache）接收请求，并通过 PHP-FPM 与 Web 服务器通信，再连接数据库、缓存等服务。本文列出 PHP 生态中常见的端口及其用途。
 
 ---
 
@@ -48,7 +48,7 @@ PHP 本身不占用端口，它是一种运行在 Web 服务器上的脚本语�
 ```
 
 - **Web 服务器端口**：对外提供 HTTP/HTTPS 服务，默认 80 / 443。
-- **PHP-FPM 端口**：Web 服务器将 `.php` 请求转发给 PHP-FPM 处理，默认 9000/TCP 或 Unix Socket[reference:1]。
+- **PHP-FPM 端口**：Web 服务器将 `.php` 请求转发给 PHP-FPM 处理，默认 9000/TCP 或 Unix Socket。
 - **数据库端口**：PHP 通过扩展（mysqli / PDO / pgsql / mongodb）连接数据库。
 - **缓存端口**：PHP 通过扩展（Redis / Memcached）连接缓存服务。
 
@@ -63,7 +63,7 @@ PHP 本身不占用端口，它是一种运行在 Web 服务器上的脚本语�
 | 80 | TCP | HTTP，未加密的网页请求 |
 | 443 | TCP | HTTPS，通过 SSL/TLS 加密的网页请求 |
 
-Nginx 默认监听 80（HTTP）和 443（HTTPS）[reference:2]。可在 `server` 块中修改：
+Nginx 默认监听 80（HTTP）和 443（HTTPS）。可在 `server` 块中修改：
 
 ```nginx
 server {
@@ -81,7 +81,7 @@ sudo nginx -t && sudo systemctl reload nginx
 
 ### 2.2 Apache 默认端口
 
-Apache 默认监听 80 端口，启用 SSL 后监听 443 端口[reference:3]。可在配置文件中修改：
+Apache 默认监听 80 端口，启用 SSL 后监听 443 端口。可在配置文件中修改：
 
 ```apache
 Listen 8080
@@ -93,7 +93,7 @@ Listen 8080
 
 ### 3.1 默认 TCP 端口 9000
 
-PHP-FPM 默认监听 `127.0.0.1:9000`，Web 服务器将 `.php` 请求转发到该端口[reference:4][reference:5]。
+PHP-FPM 默认监听 `127.0.0.1:9000`，Web 服务器将 `.php` 请求转发到该端口。
 
 配置文件位置（以 Ubuntu 为例）：
 
@@ -109,7 +109,7 @@ listen = 127.0.0.1:9000
 
 ### 3.2 Unix Socket 方式
 
-生产环境更推荐使用 Unix Socket，性能更好且无需开放 TCP 端口[reference:6]：
+生产环境更推荐使用 Unix Socket，性能更好且无需开放 TCP 端口：
 
 ```ini
 listen = /run/php/php8.1-fpm.sock
@@ -121,7 +121,7 @@ Nginx 对应配置：
 fastcgi_pass unix:/run/php/php8.1-fpm.sock;
 ```
 
-使用 Socket 方式时，无需在防火墙中放行 9000/TCP[reference:7]。
+使用 Socket 方式时，无需在防火墙中放行 9000/TCP。
 
 ### 3.3 修改 PHP-FPM 端口
 
@@ -145,7 +145,7 @@ sudo systemctl restart php{version}-fpm
 
 ### 4.1 MySQL / MariaDB（3306）
 
-MySQL 默认端口为 **3306**。PHP 的 `mysqli` 和 `PDO_MySQL` 扩展默认使用 3306 端口[reference:8]。
+MySQL 默认端口为 **3306**。PHP 的 `mysqli` 和 `PDO_MySQL` 扩展默认使用 3306 端口。
 
 PHP 配置（`php.ini`）：
 
@@ -160,11 +160,11 @@ PHP 连接示例：
 $mysqli = new mysqli("127.0.0.1", "user", "password", "database", 3306);
 ```
 
-> **注意**：`localhost` 在 PHP 中表示使用 Unix Socket 连接，而非 TCP[reference:9]。如需 TCP 连接，使用 `127.0.0.1`。
+> **注意**：`localhost` 在 PHP 中表示使用 Unix Socket 连接，而非 TCP。如需 TCP 连接，使用 `127.0.0.1`。
 
 ### 4.2 PostgreSQL（5432）
 
-PostgreSQL 默认端口为 **5432**[reference:10]。
+PostgreSQL 默认端口为 **5432**。
 
 PHP 连接示例：
 
@@ -174,7 +174,7 @@ $conn = pg_connect("host=127.0.0.1 port=5432 dbname=mydb user=postgres password=
 
 ### 4.3 MongoDB（27017）
 
-MongoDB 默认端口为 **27017**。PHP MongoDB 驱动如果不指定端口，默认使用 27017[reference:11]。
+MongoDB 默认端口为 **27017**。PHP MongoDB 驱动如果不指定端口，默认使用 27017。
 
 PHP 连接示例：
 
@@ -188,7 +188,7 @@ $client = new MongoDB\Client("mongodb://127.0.0.1:27017");
 
 ### 5.1 Redis（6379）
 
-Redis 默认端口为 **6379**。PHP 通过 `phpredis` 扩展或 `predis` 库连接[reference:12]。
+Redis 默认端口为 **6379**。PHP 通过 `phpredis` 扩展或 `predis` 库连接。
 
 ```php
 $redis = new Redis();
@@ -206,7 +206,7 @@ Laravel 等框架配置：
 
 ### 5.2 Memcached（11211）
 
-Memcached 默认端口为 **11211**。PHP `memcache` / `memcached` 扩展默认连接 11211 端口[reference:13]。
+Memcached 默认端口为 **11211**。PHP `memcache` / `memcached` 扩展默认连接 11211 端口。
 
 ```php
 $mem = new Memcached();
@@ -219,7 +219,7 @@ $mem->addServer('127.0.0.1', 11211);
 
 ### 6.1 Xdebug（9003 / 9000）
 
-Xdebug 2 默认端口为 **9000**，Xdebug 3 默认端口改为 **9003**，以避免与 PHP-FPM 的 9000 端口冲突[reference:14]。
+Xdebug 2 默认端口为 **9000**，Xdebug 3 默认端口改为 **9003**，以避免与 PHP-FPM 的 9000 端口冲突。
 
 `php.ini` 配置（Xdebug 3）：
 
@@ -230,11 +230,11 @@ xdebug.client_host = 127.0.0.1
 xdebug.idekey = PHPSTORM
 ```
 
-PhpStorm 默认同时监听 9003 和 9000 两个端口，兼容新旧版本[reference:15]。
+PhpStorm 默认同时监听 9003 和 9000 两个端口，兼容新旧版本。
 
 ### 6.2 PHP 内置 Web 服务器（8000）
 
-PHP 内置开发服务器默认监听 **8000** 端口[reference:16]：
+PHP 内置开发服务器默认监听 **8000** 端口：
 
 ```bash
 php -S 0.0.0.0:8000 -t public/
@@ -266,7 +266,7 @@ php -S 0.0.0.0:8080 -t public/
 | 错误现象 | 可能原因 | 解决方法 |
 |---|---|---|
 | `Address already in use` | 端口被其他进程占用 | 用 `netstat` 或 `lsof` 查找占用进程并停止或更换端口 |
-| PHP-FPM 启动失败 | 9000 端口被 Xdebug 2 占用 | 将 Xdebug 升级到 3（默认 9003），或修改 PHP-FPM 端口[reference:17] |
+| PHP-FPM 启动失败 | 9000 端口被 Xdebug 2 占用 | 将 Xdebug 升级到 3（默认 9003），或修改 PHP-FPM 端口 |
 | Nginx 启动失败 | 80 / 443 被 Apache 或其他服务占用 | 停止冲突服务，或修改 Nginx 监听端口 |
 | 数据库连接超时 | 防火墙未放行 3306 / 5432 / 6379 | 检查防火墙和安全组规则 |
 | Web 服务器无法访问 PHP-FPM | Socket 路径不匹配 | 确认 `fastcgi_pass` 与 PHP-FPM 的 `listen` 配置一致 |

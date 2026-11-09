@@ -13,7 +13,7 @@ description: PHP 数学函数使用文档
 
 ## 一、总览与分类
 
-PHP 的数学函数（Math 扩展）**只操作 `int` 和 `float` 范围内的值**[reference:0]。如果需要任意精度，应使用 **BCMath**（`bcadd`、`bcmul` 等）或 **GMP** 扩展[reference:1]。
+PHP 的数学函数（Math 扩展）**只操作 `int` 和 `float` 范围内的值**。如果需要任意精度，应使用 **BCMath**（`bcadd`、`bcmul` 等）或 **GMP** 扩展。
 
 按用途分类：
 
@@ -49,7 +49,7 @@ var_dump(round(3.14159, 2)); // float(3.14)
 var_dump(round(1241757, -3));// float(1242000)  负精度 → 舍入到千位
 ```
 
-**舍入模式（`$mode`）** [reference:2]：
+**舍入模式（`$mode`）**：
 
 | 常量 | 行为 | `1.5` | `-1.5` | `2.5` | `-2.5` |
 |------|------|:---:|:---:|:---:|:---:|
@@ -107,7 +107,7 @@ var_dump(floor(3.7));    // float(3)
 
 ### 3.1 `/` 与 `intdiv()`
 
-PHP 的 `/` **永远返回 float**，即使整除也是[reference:5]：
+PHP 的 `/` **永远返回 float**，即使整除也是：
 
 ```php
 var_dump(10 / 2);       // float(5)
@@ -127,20 +127,20 @@ var_dump(intdiv(10, -3));  // int(-3)
 var_dump(intdiv(-10, -3)); // int(3)
 ```
 
-**`intdiv()` 的异常**（PHP 7+）[reference:6]：
+**`intdiv()` 的异常**（PHP 7+）：
 
 ```php
 intdiv(1, 0);              // DivisionByZeroError
 intdiv(PHP_INT_MIN, -1);   // ArithmeticError（结果溢出）
 ```
 
-> `PHP_INT_MIN / -1` 的数学结果是 `PHP_INT_MAX + 1`，int 无法表示，因此抛 `ArithmeticError`[reference:7]。
+> `PHP_INT_MIN / -1` 的数学结果是 `PHP_INT_MAX + 1`，int 无法表示，因此抛 `ArithmeticError`。
 
 ---
 
 ### 3.2 `%` — 整数取模
 
-`%` 的操作数会**先被转换为整数**（去掉小数部分）[reference:8]：
+`%` 的操作数会**先被转换为整数**（去掉小数部分）：
 
 ```php
 var_dump(10 % 3);      // int(1)
@@ -156,7 +156,7 @@ var_dump(10 % -3);     // int(1)
 var_dump(-10 % -3);    // int(-1)
 ```
 
-**除零**：`1 % 0` 在 PHP 7+ 抛 `DivisionByZeroError`（旧版是 `E_WARNING`）[reference:9]。
+**除零**：`1 % 0` 在 PHP 7+ 抛 `DivisionByZeroError`（旧版是 `E_WARNING`）。
 
 ---
 
@@ -166,7 +166,7 @@ var_dump(-10 % -3);    // int(-1)
 fmod(float $num1, float $num2): float
 ```
 
-`fmod()` 接受浮点数、返回浮点余数，**不做整数截断**[reference:10]。
+`fmod()` 接受浮点数、返回浮点余数，**不做整数截断**。
 
 ```php
 var_dump(fmod(10.5, 3));    // float(1.5)    10.5 - 3*3 = 1.5
@@ -184,7 +184,7 @@ var_dump(fmod(10, 0.3));    // float(0.1)    ⚠️ 浮点精度，可能不是�
 | 适用 | 整数取余 | 浮点取余 |
 | 示例 | `10.9 % 3` → `1` | `fmod(10.9, 3)` → `1.9` |
 
-> 需要浮点余数时**必须用 `fmod()`**，`%` 会静默丢弃小数部分[reference:11]。
+> 需要浮点余数时**必须用 `fmod()`**，`%` 会静默丢弃小数部分。
 
 ---
 
@@ -194,7 +194,7 @@ var_dump(fmod(10, 0.3));    // float(0.1)    ⚠️ 浮点精度，可能不是�
 fdiv(float $num1, float $num2): float
 ```
 
-`fdiv()` 遵循 IEEE 754，**除数为 0 时不抛异常**，而是返回 `INF`、`-INF` 或 `NAN`[reference:12]。
+`fdiv()` 遵循 IEEE 754，**除数为 0 时不抛异常**，而是返回 `INF`、`-INF` 或 `NAN`。
 
 ```php
 var_dump(fdiv(1, 0));    // float(INF)
@@ -270,11 +270,11 @@ var_dump(log(-1));       // float(NAN)
 | 函数 | 算法 | 安全性 | 用途 |
 |------|------|--------|------|
 | `rand()` | 旧 libc 随机数 | ❌ 不安全 | 仅遗留代码，**新代码不用** |
-| `mt_rand()` | Mersenne Twister | ❌ 非加密安全 | 展示、游戏、普通随机抽样[reference:13] |
-| `random_int()` | CSPRNG | ✅ 加密安全 | 令牌、验证码、密码重置、抽奖[reference:14] |
+| `mt_rand()` | Mersenne Twister | ❌ 非加密安全 | 展示、游戏、普通随机抽样 |
+| `random_int()` | CSPRNG | ✅ 加密安全 | 令牌、验证码、密码重置、抽奖 |
 | `random_bytes()` | CSPRNG | ✅ 加密安全 | 原始随机字节，配合 `bin2hex()` 使用 |
 
-> `mt_rand()` 虽然比 `rand()` 快且随机性更好，但**可预测**，绝不能用于安全敏感场景[reference:15]。
+> `mt_rand()` 虽然比 `rand()` 快且随机性更好，但**可预测**，绝不能用于安全敏感场景。
 
 ### 5.2 用法
 
@@ -372,7 +372,7 @@ var_dump(number_format(0.615, 2));                          // "0.62"   四舍�
 var_dump(number_format(1234.5678, 2, '.', ''));             // "1234.57" 不要千分位
 ```
 
-> `number_format()` **返回字符串**，不是数字。它用于**展示**，不能替代数学计算中的精度处理。不要指望 `number_format()` “修复”浮点误差，它只是格式化字符串[reference:16]。
+> `number_format()` **返回字符串**，不是数字。它用于**展示**，不能替代数学计算中的精度处理。不要指望 `number_format()` “修复”浮点误差，它只是格式化字符串。
 
 ### 7.2 `sprintf('%.2f')` 与 `number_format()` 的区别
 
@@ -389,7 +389,7 @@ number_format(0.615, 2);         // "0.62"    四舍五入，有千分位（默�
 
 ### 8.1 浮点永远不要用 `==` / `===` 直接比较
 
-PHP 浮点是 IEEE 754 双精度，`0.1 + 0.2` **不等于** `0.3`[reference:17]：
+PHP 浮点是 IEEE 754 双精度，`0.1 + 0.2` **不等于** `0.3`：
 
 ```php
 var_dump(0.1 + 0.2);          // float(0.30000000000000004)
@@ -414,7 +414,7 @@ function floatEquals(float $a, float $b, float $relEps = 1e-9): bool {
 }
 ```
 
-> PHP 手册明确指出：**永远不要相信浮点数结果精确到了最后一位，也永远不要比较两个浮点数是否相等**[reference:18]。
+> PHP 手册明确指出：**永远不要相信浮点数结果精确到了最后一位，也永远不要比较两个浮点数是否相等**。
 
 ### 8.2 `round()` 的精度陷阱
 
@@ -439,7 +439,7 @@ var_dump(round(0.615 + 1e-9, 2));              // float(0.62)
 
 ### 8.3 金额：永远不要用 float 存储和计算
 
-浮点舍入误差在金额场景会造成**账目不一致**，且可能被利用[reference:19]。
+浮点舍入误差在金额场景会造成**账目不一致**，且可能被利用。
 
 ```php
 // ❌ 错误：用 float 算金额
@@ -457,7 +457,7 @@ bcadd('19.99', '19.99', 2);      // "39.98"
 bcmul('19.99', '3', 2);          // "59.97"
 ```
 
-> `number_format()` / `round()` **只改变字符串或返回值，不修复底层数值**。金额精度必须在**存储层和运算层**用整数分或 BCMath 解决[reference:20]。
+> `number_format()` / `round()` **只改变字符串或返回值，不修复底层数值**。金额精度必须在**存储层和运算层**用整数分或 BCMath 解决。
 
 ### 8.4 `NAN` 的特殊行为
 
@@ -473,7 +473,7 @@ var_dump($nan > 1);       // bool(false)
 
 ### 8.5 整数溢出
 
-PHP 整数溢出时**静默转为 float**，不会像 C 那样回绕[reference:21]：
+PHP 整数溢出时**静默转为 float**，不会像 C 那样回绕：
 
 ```php
 var_dump(PHP_INT_MAX);          // int(9223372036854775807)

@@ -69,7 +69,7 @@ Redis 本身不是专业的消息队列中间件，但凭借其高性能和丰�
 | Pub/Sub | 发布订阅 | 实时通知（不持久化） |
 | Keyspace Notification | 键空间通知 | 延迟任务（不推荐生产） |
 
-Redis 5.0 引入 Stream 后，队列能力大幅增强，支持消费者组、消息确认、消息回溯等特性[reference:0]。
+Redis 5.0 引入 Stream 后，队列能力大幅增强，支持消费者组、消息确认、消息回溯等特性。
 
 ---
 
@@ -77,7 +77,7 @@ Redis 5.0 引入 Stream 后，队列能力大幅增强，支持消费者组、�
 
 ### 2.1 基本原理
 
-List 是最简单的队列实现方式。生产者使用 `LPUSH` 将消息推入列表头部，消费者使用 `RPOP` 从列表尾部弹出消息，保证 FIFO 顺序[reference:1]。
+List 是最简单的队列实现方式。生产者使用 `LPUSH` 将消息推入列表头部，消费者使用 `RPOP` 从列表尾部弹出消息，保证 FIFO 顺序。
 
 ```
 生产者 → LPUSH queue msg1
@@ -91,9 +91,9 @@ List 是最简单的队列实现方式。生产者使用 `LPUSH` 将消息推入
 
 ### 2.2 BRPOP 阻塞消费
 
-直接使用 `RPOP` 的问题：队列为空时返回 `NULL`，消费者需要不断轮询，造成 CPU 空转[reference:2]。
+直接使用 `RPOP` 的问题：队列为空时返回 `NULL`，消费者需要不断轮询，造成 CPU 空转。
 
-解决方案：使用 `BRPOP`（阻塞式弹出），队列为空时阻塞等待，直到有新消息或超时[reference:3]。
+解决方案：使用 `BRPOP`（阻塞式弹出），队列为空时阻塞等待，直到有新消息或超时。
 
 ```bash
 # 阻塞式消费，超时 0 表示永久阻塞
@@ -115,11 +115,11 @@ while (true) {
 }
 ```
 
-> **注意**：如果超时时间设置太长，连接长期不活跃可能被 Redis 服务器判定为无效连接并断开，客户端需要实现重连机制[reference:4]。
+> **注意**：如果超时时间设置太长，连接长期不活跃可能被 Redis 服务器判定为无效连接并断开，客户端需要实现重连机制。
 
 ### 2.3 可靠队列 RPOPLPUSH
 
-List 队列的致命问题：消费者 `RPOP` 取出消息后如果宕机，消息就永久丢失了[reference:5]。
+List 队列的致命问题：消费者 `RPOP` 取出消息后如果宕机，消息就永久丢失了。
 
 解决方案：使用 `RPOPLPUSH`（或 `BRPOPLPUSH`），将消息原子性地从主队列转移到"处理中队列"，处理完成后再删除。
 
@@ -163,9 +163,9 @@ while (true) {
 
 ### 3.1 基本原理
 
-延迟队列的本质是"时间驱动的队列"：生产者指定任务的执行时间，消费者只在任务到期时才取出处理[reference:6]。
+延迟队列的本质是"时间驱动的队列"：生产者指定任务的执行时间，消费者只在任务到期时才取出处理。
 
-ZSet（有序集合）的每个元素有一个 `score`，利用 `score` 存储任务到期时间戳，ZSet 自动按 score 排序，最早到期的任务排在最前面[reference:7]。
+ZSet（有序集合）的每个元素有一个 `score`，利用 `score` 存储任务到期时间戳，ZSet 自动按 score 排序，最早到期的任务排在最前面。
 
 ```
 ZADD delay_queue 1694505600 '{"task_id": 1, "type": "email"}'
@@ -237,9 +237,9 @@ while (true) {
 
 ### 3.3 Lua 脚本保证原子性
 
-**问题**：多消费者并发时，"查询到期任务"和"删除任务"是两个独立操作，可能出现多个消费者同时查询到同一条任务，导致重复消费[reference:8]。
+**问题**：多消费者并发时，"查询到期任务"和"删除任务"是两个独立操作，可能出现多个消费者同时查询到同一条任务，导致重复消费。
 
-**解决**：使用 Lua 脚本将"查询 + 删除 + 返回"合并为原子操作[reference:9]。
+**解决**：使用 Lua 脚本将"查询 + 删除 + 返回"合并为原子操作。
 
 ```lua
 -- 原子化获取到期任务
@@ -266,7 +266,7 @@ LUA;
 $tasks = $redis->eval($luaScript, ['delay_queue', time(), 10], 1);
 ```
 
-> **说明**：`ZREM` 和 `ZRANGEBYSCORE` 通过 Lua 脚本保证原子执行，多个消费者不会拿到同一条任务[reference:10]。
+> **说明**：`ZREM` 和 `ZRANGEBYSCORE` 通过 Lua 脚本保证原子执行，多个消费者不会拿到同一条任务。
 
 ### 3.4 多消费者并发处理
 
@@ -343,7 +343,7 @@ while (true) {
 
 ### 4.1 基本原理
 
-Stream 是 Redis 5.0 引入的数据结构，专为消息队列设计。它是一个只允许追加的日志结构，消息有唯一 ID，支持消费者组、消息确认和消息回溯[reference:11]。
+Stream 是 Redis 5.0 引入的数据结构，专为消息队列设计。它是一个只允许追加的日志结构，消息有唯一 ID，支持消费者组、消息确认和消息回溯。
 
 ```bash
 # 添加消息
@@ -356,7 +356,7 @@ XREAD COUNT 10 STREAMS mystream 0
 
 ### 4.2 消费者组
 
-消费者组是 Stream 最强大的特性：多个消费者可以共同消费同一个 Stream，每条消息只会被组内一个消费者处理[reference:12]。
+消费者组是 Stream 最强大的特性：多个消费者可以共同消费同一个 Stream，每条消息只会被组内一个消费者处理。
 
 ```bash
 # 创建消费者组
@@ -407,9 +407,9 @@ while (true) {
 
 ### 4.3 消息确认与重试
 
-Stream 的消费者组维护一个 **PEL（Pending Entries List，待处理条目列表）** ：消费者读取消息后，消息进入 PEL，直到调用 `XACK` 确认后才会移除[reference:13]。
+Stream 的消费者组维护一个 **PEL（Pending Entries List，待处理条目列表）** ：消费者读取消息后，消息进入 PEL，直到调用 `XACK` 确认后才会移除。
 
-如果消费者崩溃，未确认的消息留在 PEL 中，可以用 `XAUTOCLAIM`（Redis 6.2+）将超时未确认的消息重新分配给其他消费者[reference:14]。
+如果消费者崩溃，未确认的消息留在 PEL 中，可以用 `XAUTOCLAIM`（Redis 6.2+）将超时未确认的消息重新分配给其他消费者。
 
 ```php
 // 后台补偿任务：回收超时未确认的消息
@@ -420,7 +420,7 @@ $claimed = $redis->xAutoClaim('task_stream', 'workers', 'worker-2', 60000, '0');
 
 ### 4.4 死信队列
 
-当消息重试超过最大次数后，将其转入死信队列（DLQ），避免无限重试[reference:15]。
+当消息重试超过最大次数后，将其转入死信队列（DLQ），避免无限重试。
 
 ```php
 // 检查消息投递次数
@@ -450,7 +450,7 @@ if ($deliveryCount >= 3) {
 
 ### 5.1 基本原理
 
-Keyspace Notification 允许客户端订阅 Redis 的键过期事件。将一个 key 设置 TTL，到期后 Redis 通过 Pub/Sub 发布通知，客户端监听后执行对应任务[reference:16]。
+Keyspace Notification 允许客户端订阅 Redis 的键过期事件。将一个 key 设置 TTL，到期后 Redis 通过 Pub/Sub 发布通知，客户端监听后执行对应任务。
 
 ```bash
 # 开启键空间通知（Ex 表示过期事件）
@@ -474,7 +474,7 @@ $redis->subscribe(['__keyevent@0__:expired'], function ($redis, $channel, $key) 
 
 ### 5.2 实现步骤
 
-1. 配置 `notify-keyspace-events` 为 `Ex`[reference:17]。
+1. 配置 `notify-keyspace-events` 为 `Ex`。
 2. 生产者将任务存入 Redis 并设置 TTL。
 3. 消费者订阅 `__keyevent@<db>__:expired` 频道。
 4. 收到过期事件后，根据 key 名执行对应任务。
@@ -489,7 +489,7 @@ $redis->subscribe(['__keyevent@0__:expired'], function ($redis, $channel, $key) 
 | 时间精度 | 不精确，过期删除是惰性+定期扫描，可能延迟数秒到数分钟 |
 | 适用场景 | **不推荐生产环境使用**，仅适合对可靠性要求极低的场景 |
 
-> Redis 官方文档明确指出：Redis 从未保证会在设定的过期时间立即删除并发送过期通知[reference:18]。
+> Redis 官方文档明确指出：Redis 从未保证会在设定的过期时间立即删除并发送过期通知。
 
 ---
 
@@ -497,9 +497,9 @@ $redis->subscribe(['__keyevent@0__:expired'], function ($redis, $channel, $key) 
 
 ### 6.1 基本原理
 
-Redisson 是 Redis 的 Java 客户端，提供了开箱即用的 `RDelayedQueue`，底层基于 ZSet + Pub/Sub 实现[reference:19]。
+Redisson 是 Redis 的 Java 客户端，提供了开箱即用的 `RDelayedQueue`，底层基于 ZSet + Pub/Sub 实现。
 
-核心流程：将延迟消息存入 ZSet（score = 到期时间），后台线程轮询 ZSet，到期后转移到目标队列，消费者从目标队列阻塞获取[reference:20]。
+核心流程：将延迟消息存入 ZSet（score = 到期时间），后台线程轮询 ZSet，到期后转移到目标队列，消费者从目标队列阻塞获取。
 
 ### 6.2 使用方式
 
@@ -516,7 +516,7 @@ processMessage(msg);
 
 ### 6.3 内部结构
 
-Redisson 内部使用三个队列协同工作[reference:21]：
+Redisson 内部使用三个队列协同工作：
 
 | 队列 | 作用 |
 |---|---|
@@ -575,8 +575,8 @@ Redisson 内部使用三个队列协同工作[reference:21]：
 
 常用幂等方案：
 
-1. **Redis 去重**：用消息 ID 作为 key，`SET NX` 标记已处理，设置合理 TTL[reference:22]。
-2. **数据库唯一索引**：业务表加唯一索引，重复插入报错即忽略[reference:23]。
+1. **Redis 去重**：用消息 ID 作为 key，`SET NX` 标记已处理，设置合理 TTL。
+2. **数据库唯一索引**：业务表加唯一索引，重复插入报错即忽略。
 3. **状态机**：任务有明确状态流转，已处理状态不可重复处理。
 
 ```php
@@ -719,9 +719,9 @@ function scheduleRetry($redis, $task, $retryCount) {
 ## 10. 性能与注意事项
 
 - **List**：`LPUSH` / `RPOP` 时间复杂度 O(1)，性能最好。
-- **ZSet**：`ZADD` 复杂度 O(M*log(N))，`ZRANGEBYSCORE` 复杂度 O(log(N)+M)，N 为元素数量[reference:24]。
+- **ZSet**：`ZADD` 复杂度 O(M*log(N))，`ZRANGEBYSCORE` 复杂度 O(log(N)+M)，N 为元素数量。
 - **Stream**：`XADD` 复杂度 O(1)，`XREADGROUP` 复杂度 O(log(N))。
-- **轮询开销**：ZSet 方案需要轮询，频率越高精度越高但 CPU 消耗越大。秒级精度建议 1 秒轮询[reference:25]。
+- **轮询开销**：ZSet 方案需要轮询，频率越高精度越高但 CPU 消耗越大。秒级精度建议 1 秒轮询。
 - **内存占用**：Stream 比 List 占用更多内存，因为需要维护 PEL 和消息 ID。
 - **ZSet 不能存重复元素**：如果任务体完全相同，`ZADD` 不会新增，需要用任务 ID 保证唯一性。
 - **大 key 风险**：延迟队列可能积累大量任务，注意监控 ZSet 的元素数量和内存占用。
